@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import './App.css';
 import Canvas from './components/Canvas/RoomCanvas';
 import FurnitureCatalog from './components/Sidebar/FurnitureCatalog';
 import BudgetPanel from './components/Sidebar/BudgetPanel';
@@ -121,61 +122,75 @@ function App() {
 
   const closeModal = (e) => { if (e.target === e.currentTarget) setModal(null); };
 
-  const modalCard = {
-    background: '#fff', borderRadius: 16,
-    boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
-    width: 420, maxWidth: '92vw', overflow: 'hidden',
-  };
-
   return (
-    <div style={{ display:'flex', width:'100vw', height:'100vh', background:'#f0f2f5', overflow:'hidden', position:'relative' }}>
+    <div className="app-shell">
+      <header className="app-top-bar">
+        <div className="app-top-brand">
+          <span className="app-logo">Planner 5D</span>
+          <span className="app-breadcrumb">My Projects <span className="breadcrumb-sep">›</span> Living Room</span>
+        </div>
+        <div className="app-top-actions">
+          <button type="button" className="top-pill">3D</button>
+          <button type="button" className="top-pill">VR</button>
+          <button type="button" className="top-pill primary">Save</button>
+          <div className="top-avatar">V</div>
+        </div>
+      </header>
 
-      <FurnitureCatalog onSelectFurniture={setPendingFurniture} />
+      <div className="app-content">
+        <div className="app-sidebar-left">
+          <FurnitureCatalog onSelectFurniture={setPendingFurniture} />
+        </div>
 
-      <div style={{ flex:1, display:'flex', minWidth:0, overflow:'hidden' }}>
-        <Canvas
-          pendingFurniture={pendingFurniture}
-          onFurniturePlaced={() => setPendingFurniture(null)}
-          placedFurniture={placedFurniture}
-          setPlacedFurniture={setPlacedFurniture}
+        <div className="app-canvas-area">
+          <Canvas
+            pendingFurniture={pendingFurniture}
+            onFurniturePlaced={() => setPendingFurniture(null)}
+            placedFurniture={placedFurniture}
+            setPlacedFurniture={setPlacedFurniture}
+            rooms={rooms}
+            setRooms={setRooms}
+            onSaveClick={quickSave}
+            onSaveAsClick={() => { setSaveName(''); setModal('save'); }}
+            onLoadClick={openLoadModal}
+          />
+        </div>
+        <div className="app-sidebar-right">
+        <BudgetPanel
           rooms={rooms}
-          setRooms={setRooms}
-          onSaveClick={quickSave}
-          onSaveAsClick={() => { setSaveName(''); setModal('save'); }}
-          onLoadClick={openLoadModal}
+          placedFurniture={placedFurniture}
+          onPriceChange={handlePriceChange}
+          onRemove={handleRemoveItem}
         />
       </div>
-
-      <BudgetPanel
-        placedFurniture={placedFurniture}
-        onPriceChange={handlePriceChange}
-        onRemove={handleRemoveItem}
-      />
+    </div>
 
       {/* ════ SAVE MODAL ════ */}
       {modal === 'save' && (
-        <div onClick={closeModal} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:999 }}>
-          <div style={modalCard}>
-            <div style={{ background:'linear-gradient(135deg,#6b5b95,#9333ea)', padding:'18px 22px', color:'#fff' }}>
-              <div style={{ fontWeight:800, fontSize:15 }}>💾 Save Design</div>
-              <div style={{ fontSize:11, opacity:0.8, marginTop:2 }}>
-                {rooms.length} room{rooms.length!==1?'s':''} · {placedFurniture.length} item{placedFurniture.length!==1?'s':''}
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="app-modal-card">
+            <div className="app-modal-header save">
+              <div>
+                <div className="app-modal-title">💾 Save Design</div>
+                <div className="app-modal-subtitle">
+                  {rooms.length} room{rooms.length!==1?'s':''} · {placedFurniture.length} item{placedFurniture.length!==1?'s':''}
+                </div>
               </div>
             </div>
-            <div style={{ padding:'22px 22px 20px' }}>
-              <label style={{ fontSize:12, fontWeight:600, color:'#334155', display:'block', marginBottom:8 }}>Design name</label>
+            <div className="app-modal-content">
+              <label className="app-modal-label">Design name</label>
               <input
                 autoFocus value={saveName}
                 onChange={e => setSaveName(e.target.value)}
                 onKeyDown={e => e.key==='Enter' && !saving && handleSave()}
                 placeholder="e.g. Master Bedroom Layout"
-                style={{ width:'100%', boxSizing:'border-box', padding:'10px 13px', borderRadius:9, border:'1.5px solid #e2e5ea', fontSize:13, fontFamily:'inherit', outline:'none', color:'#1e293b' }}
-                onFocus={e => e.target.style.borderColor='#6b5b95'}
-                onBlur={e => e.target.style.borderColor='#e2e5ea'}
+                className="app-modal-input"
               />
-              <div style={{ display:'flex', gap:10, marginTop:18, justifyContent:'flex-end' }}>
-                <button onClick={() => setModal(null)} style={{ padding:'9px 20px', borderRadius:8, border:'1.5px solid #e2e5ea', background:'#f7f8fa', fontSize:13, fontWeight:600, color:'#64748b', cursor:'pointer', fontFamily:'inherit' }}>Cancel</button>
-                <button onClick={handleSave} disabled={saving} style={{ padding:'9px 24px', borderRadius:8, background:saving?'#a78bfa':'linear-gradient(135deg,#6b5b95,#9333ea)', border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:saving?'not-allowed':'pointer', fontFamily:'inherit' }}>
+              <div className="app-modal-row">
+                <button type="button" className="app-modal-button secondary" onClick={() => setModal(null)}>
+                  Cancel
+                </button>
+                <button type="button" className={`app-modal-button primary${saving ? ' disabled' : ''}`} onClick={handleSave} disabled={saving}>
                   {saving ? 'Saving…' : '💾 Save'}
                 </button>
               </div>
@@ -186,36 +201,33 @@ function App() {
 
       {/* ════ LOAD MODAL ════ */}
       {modal === 'load' && (
-        <div onClick={closeModal} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:999 }}>
-          <div style={{ ...modalCard, width:500 }}>
-            <div style={{ background:'linear-gradient(135deg,#1e293b,#334155)', padding:'18px 22px', color:'#fff', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="app-modal-card wide">
+            <div className="app-modal-header load">
               <div>
-                <div style={{ fontWeight:800, fontSize:15 }}>📂 Saved Designs</div>
-                <div style={{ fontSize:11, opacity:0.7, marginTop:2 }}>Click a design to restore it</div>
+                <div className="app-modal-title">📂 Saved Designs</div>
+                <div className="app-modal-subtitle light">Click a design to restore it</div>
               </div>
-              <button onClick={() => setModal(null)} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:6, color:'#fff', fontSize:16, cursor:'pointer', width:30, height:30 }}>✕</button>
+              <button type="button" className="app-modal-close-button" onClick={() => setModal(null)}>✕</button>
             </div>
-            <div style={{ maxHeight:380, overflowY:'auto', padding:'10px 12px 16px' }}>
+            <div className="saved-designs-list">
               {loadingList ? (
-                <div style={{ textAlign:'center', padding:'40px 0', color:'#94a3b8', fontSize:13 }}>Loading designs…</div>
+                <div className="catalog-no-results">Loading designs…</div>
               ) : designs.length === 0 ? (
-                <div style={{ textAlign:'center', padding:'40px 0' }}>
-                  <div style={{ fontSize:36, marginBottom:10 }}>🗂</div>
-                  <div style={{ color:'#94a3b8', fontSize:13 }}>No saved designs yet</div>
-                  <div style={{ color:'#cbd5e1', fontSize:11, marginTop:4 }}>Press Ctrl+S to quick-save your current design</div>
+                <div className="empty-designs-state">
+                  <div className="empty-designs-graphic">🗂</div>
+                  <div className="empty-designs-copy">No saved designs yet</div>
+                  <div className="empty-designs-subcopy">Press Ctrl+S to quick-save your current design</div>
                 </div>
               ) : designs.map(d => (
-                <div key={d.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:10, border:'1.5px solid #e2e5ea', marginBottom:8, background:'#f7f8fa', cursor:'pointer', transition:'all 0.15s' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor='#6b5b95'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor='#e2e5ea'}
-                >
-                  <div style={{ width:40, height:40, borderRadius:10, flexShrink:0, background:'linear-gradient(135deg,#6b5b95,#9333ea)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🏠</div>
-                  <div style={{ flex:1, minWidth:0 }} onClick={() => handleLoad(d.id)}>
-                    <div style={{ fontWeight:700, fontSize:13, color:'#1e293b', marginBottom:2 }}>{d.name}</div>
-                    <div style={{ fontSize:10, color:'#94a3b8' }}>{d.roomCount} room{d.roomCount!==1?'s':''} · {d.furnitureCount} item{d.furnitureCount!==1?'s':''} · {fmtDate(d.savedAt)}</div>
+                <div key={d.id} className="saved-design-card" onClick={() => handleLoad(d.id)}>
+                  <div className="saved-design-avatar">🏠</div>
+                  <div className="saved-design-info">
+                    <div className="saved-design-name">{d.name}</div>
+                    <div className="saved-design-meta">{d.roomCount} room{d.roomCount!==1?'s':''} · {d.furnitureCount} item{d.furnitureCount!==1?'s':''} · {fmtDate(d.savedAt)}</div>
                   </div>
-                  <button onClick={() => handleLoad(d.id)} style={{ padding:'6px 14px', borderRadius:7, background:'linear-gradient(135deg,#6b5b95,#9333ea)', border:'none', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>Load</button>
-                  <button onClick={e => { e.stopPropagation(); handleDelete(d.id); }} title="Delete" style={{ width:28, height:28, borderRadius:7, flexShrink:0, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑</button>
+                  <button type="button" className="saved-design-load" onClick={() => handleLoad(d.id)}>Load</button>
+                  <button type="button" className="saved-design-trash" onClick={e => { e.stopPropagation(); handleDelete(d.id); }} title="Delete">🗑</button>
                 </div>
               ))}
             </div>
@@ -225,7 +237,7 @@ function App() {
 
       {/* ════ TOAST ════ */}
       {toast && (
-        <div style={{ position:'fixed', bottom:28, left:'50%', transform:'translateX(-50%)', background:toast.ok?'#1e293b':'#7f1d1d', color:'#fff', borderRadius:20, padding:'9px 22px', fontSize:13, fontWeight:600, boxShadow:'0 8px 24px rgba(0,0,0,0.25)', zIndex:1000, whiteSpace:'nowrap' }}>
+        <div className={`toast-message ${toast.ok ? 'success' : 'error'}`}>
           {toast.msg}
         </div>
       )}

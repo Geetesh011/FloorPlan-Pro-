@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
 import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow } from 'react-konva';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
@@ -65,40 +65,6 @@ function FurnitureIconImage({ url, width, height }) {
     return <Rect width={width} height={height} fill="#e8e0f0" cornerRadius={4} opacity={0.5} />;
   }
   return <KonvaImage image={image} x={0} y={0} width={width} height={height} />;
-}
-
-// ── Premium toolbar button ────────────────────────────────────────────────
-function TBtn({ label, onClick, disabled, variant, tip }) {
-  const base = {
-    display: 'flex', alignItems: 'center', gap: 5,
-    border: '1px solid', borderRadius: 6,
-    fontSize: 12, fontWeight: 500, padding: '5px 13px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    fontFamily: 'inherit', transition: 'all 0.15s', letterSpacing: '0.1px',
-    outline: 'none', whiteSpace: 'nowrap',
-  };
-  const styles = {
-    default: {
-      background: disabled ? 'transparent' : 'rgba(255,255,255,0.07)',
-      borderColor: disabled ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)',
-      color: disabled ? 'rgba(255,255,255,0.22)' : '#d1d5db',
-    },
-    primary: {
-      background: 'linear-gradient(135deg,#6b5b95,#9333ea)',
-      borderColor: 'rgba(107,91,149,0.4)',
-      color: '#fff',
-    },
-    danger: {
-      background: disabled ? 'transparent' : 'rgba(239,68,68,0.1)',
-      borderColor: disabled ? 'rgba(255,255,255,0.06)' : 'rgba(239,68,68,0.35)',
-      color: disabled ? 'rgba(255,255,255,0.22)' : '#f87171',
-    },
-  };
-  return (
-    <button onClick={!disabled ? onClick : undefined} title={tip || label} style={{ ...base, ...styles[variant || 'default'] }}>
-      {label}
-    </button>
-  );
 }
 
 function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, onSaveClick, onSaveAsClick, onLoadClick }) {
@@ -509,7 +475,18 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         <Line
           key={`${keyPrefix}-w-${i}`}
           points={[p1.x, p1.y, p2.x, p2.y]}
-          stroke={WALL_COLOR} strokeWidth={2.5}
+          stroke={WALL_COLOR}
+          strokeWidth={8}
+          lineCap="round"
+        />
+      );
+      walls.push(
+        <Line
+          key={`${keyPrefix}-wi-${i}`}
+          points={[p1.x, p1.y, p2.x, p2.y]}
+          stroke="#6B7280"
+          strokeWidth={2}
+          lineCap="round"
         />
       );
 
@@ -674,116 +651,87 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   });
 
   return (
-    <div
-      ref={containerRef}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', background: '#eef0f4', minWidth: 0 }}
-    >
+    <div ref={containerRef} className="room-canvas-shell">
       {/* ══════════ TOP BAR — Planner5D style ══════════ */}
-      <div style={{
-        height: 48, flexShrink: 0,
-        background: 'rgba(15,15,25,0.96)',
-        backdropFilter: 'blur(14px)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex', alignItems: 'center',
-        padding: '0 16px', gap: 4,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
-        zIndex: 10,
-      }}>
+      <div className="canvas-top-bar">
 
         {/* ── Draw action ── */}
         <button
+          type="button"
           onClick={finishRoom}
-          style={{
-            ...iconBtn(),
-            background: 'linear-gradient(135deg,#6b5b95,#9333ea)',
-            border: 'none', color: '#fff',
-            width: 'auto', padding: '0 14px', gap: 6,
-            fontSize: 12, fontWeight: 600, letterSpacing: '0.2px',
-          }}
+          className="canvas-action-button primary canvas-top-action"
           title="Finish drawing room"
         >
           ✦ Finish Room
         </button>
 
-        <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+        <div className="canvas-top-separator" />
 
         {/* ── Save / Load ── */}
-        {/* 💾 Ctrl+S — instant quick-save (no dialog) */}
         <button
+          type="button"
           onClick={onSaveClick}
           title="Quick save (Ctrl+S)"
-          style={iconBtn({ background: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80', fontSize: 14 })}
+          className="canvas-icon-button success"
         >💾</button>
-        {/* 📝 Ctrl+Shift+S — opens naming dialog */}
         <button
+          type="button"
           onClick={onSaveAsClick}
           title="Save As… (Ctrl+Shift+S)"
-          style={iconBtn({ background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.2)', color: '#86efac', fontSize: 11, fontWeight: 700, width: 'auto', padding: '0 8px', letterSpacing: 0 })}
+          className="canvas-icon-button secondary"
         >AS</button>
-        {/* 📂 Load modal */}
         <button
+          type="button"
           onClick={onLoadClick}
           title="Load a saved design (Ctrl+O)"
-          style={iconBtn({ background: 'rgba(59,130,246,0.12)', borderColor: 'rgba(59,130,246,0.3)', color: '#60a5fa', fontSize: 14 })}
+          className="canvas-icon-button info"
         >📂</button>
 
-        <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+        <div className="canvas-top-separator" />
 
-        {/* ── Undo / Redo ── */}
         <button
+          type="button"
           onClick={undo}
           disabled={historyRef.current.length === 0}
           title="Undo (Ctrl+Z)"
-          style={iconBtn({ opacity: historyRef.current.length === 0 ? 0.3 : 1 })}
+          className="canvas-icon-button"
         >
           ↩
         </button>
 
-        <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
+        <div className="canvas-top-separator" />
 
-        {/* ── Delete selected ── */}
         <button
+          type="button"
           onClick={handleDeleteSelected}
           disabled={!selectedId}
           title="Delete selected item"
-          style={iconBtn({
-            opacity: !selectedId ? 0.3 : 1,
-            color: '#f87171',
-            borderColor: !selectedId ? 'rgba(255,255,255,0.06)' : 'rgba(239,68,68,0.35)',
-            background: !selectedId ? 'transparent' : 'rgba(239,68,68,0.1)',
-          })}
+          className="canvas-icon-button danger"
         >
-          🗑
+          
         </button>
 
-        {/* ── Clear all ── */}
         <button
+          type="button"
           onClick={clearAll}
           title="Clear all"
-          style={iconBtn({ color: '#f87171', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)' })}
+          className="canvas-action-button danger canvas-top-action"
         >
           ✕
         </button>
 
-        {/* ── Spacer + status ── */}
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.5px' }}>
+        <div className="canvas-top-spacer" />
+        <span className="canvas-top-status">
           {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {placedFurniture.length} item{placedFurniture.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* ══════════ CANVAS AREA ══════════ */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div className="canvas-stage-wrapper">
 
         {/* Placement hint toast */}
         {pendingFurniture && (
-          <div style={{
-            position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(107,91,149,0.92)', backdropFilter: 'blur(10px)',
-            color: '#fff', borderRadius: 20, padding: '7px 20px',
-            fontSize: 13, fontWeight: 500, zIndex: 20, pointerEvents: 'none',
-            whiteSpace: 'nowrap', boxShadow: '0 4px 20px rgba(107,91,149,0.4)',
-          }}>
+          <div className="canvas-toast">
             📐 Click to place: <strong>{pendingFurniture.name}</strong>
           </div>
         )}
@@ -797,7 +745,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           onMouseMove={handleMouseMove}
           onDblClick={handleDoubleClick}
           onWheel={handleWheel}
-          style={{ cursor: 'crosshair' }}
+          className="canvas-stage"
         >
           <Layer>
             {gridLines}
@@ -808,11 +756,30 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
               const centerX = room.points.reduce((s, p) => s + p.x, 0) / room.points.length;
               const centerY = room.points.reduce((s, p) => s + p.y, 0) / room.points.length;
               return (
-                <>
-                  <Line key={`floor-${ri}`} points={floorPoints} closed fill="#ddeeff" stroke="#334155" strokeWidth={2.5} />
-                  {walls}{labels}
-                  <Text key={`rl-${ri}`} x={centerX - 30} y={centerY} text={room.label} fontSize={14} fontStyle="bold" fill="#1e293b" />
-                </>
+                <React.Fragment key={`room-fragment-${ri}`}>
+                  <Line
+                    key={`floor-${ri}`}
+                    points={floorPoints}
+                    closed
+                    fill="#d2a96e"
+                    stroke="#334155"
+                    strokeWidth={3}
+                    shadowColor="#000"
+                    shadowBlur={12}
+                    shadowOpacity={0.12}
+                  />
+                  {walls}
+                  {labels}
+                  <Text
+                    key={`rl-${ri}`}
+                    x={centerX - 40}
+                    y={centerY - 10}
+                    text={room.label}
+                    fontSize={14}
+                    fontStyle="bold"
+                    fill="#1f2937"
+                  />
+                </React.Fragment>
               );
             })}
 
@@ -880,13 +847,9 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         </Stage>
 
         {/* ══════════ RIGHT ZOOM RAIL — Planner5D style ══════════ */}
-        <div style={{
-          position: 'absolute', right: 16, bottom: 24,
-          display: 'flex', flexDirection: 'column', gap: 6,
-          zIndex: 15,
-        }}>
-          {/* Reset view */}
+        <div className="canvas-zoom-rail">
           <button
+            type="button"
             title="Reset view (fit to screen)"
             onClick={() => {
               const stage = stageRef.current;
@@ -895,18 +858,17 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
               stage.position({ x: 0, y: 0 });
               stage.batchDraw();
             }}
-            style={iconBtn({ background: '#fff', color: '#555', border: '1px solid #e2e5ea', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', fontSize: 13 })}
+            className="canvas-rail-button"
           >⊙</button>
-          <div style={{ height: 1, background: '#ddd', margin: '2px 0' }} />
-          {/* Zoom in */}
+          <div className="canvas-rail-divider" />
           <button
+            type="button"
             title="Zoom in (or scroll up)"
             onClick={() => {
               const stage = stageRef.current;
               if (!stage) return;
               const oldScale = stage.scaleX();
               const newScale = Math.min(oldScale * 1.2, 4);
-              // zoom toward canvas center
               const cx = stageSize.width / 2;
               const cy = stageSize.height / 2;
               const mousePointTo = { x: (cx - stage.x()) / oldScale, y: (cy - stage.y()) / oldScale };
@@ -914,10 +876,10 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
               stage.position({ x: cx - mousePointTo.x * newScale, y: cy - mousePointTo.y * newScale });
               stage.batchDraw();
             }}
-            style={iconBtn({ background: '#fff', color: '#333', border: '1px solid #e2e5ea', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', fontSize: 18, fontWeight: 700 })}
+            className="canvas-rail-button"
           >+</button>
-          {/* Zoom out */}
           <button
+            type="button"
             title="Zoom out (or scroll down)"
             onClick={() => {
               const stage = stageRef.current;
@@ -931,40 +893,23 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
               stage.position({ x: cx - mousePointTo.x * newScale, y: cy - mousePointTo.y * newScale });
               stage.batchDraw();
             }}
-            style={iconBtn({ background: '#fff', color: '#333', border: '1px solid #e2e5ea', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', fontSize: 18, fontWeight: 700 })}
+            className="canvas-rail-button"
           >−</button>
         </div>
       </div>
 
       {/* ── Room naming dialog (dark, floating) ── */}
       {pendingRoom && (
-        <div style={{
-          position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(12,12,20,0.97)', backdropFilter: 'blur(14px)',
-          border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14,
-          padding: '20px 22px', boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
-          zIndex: 30, minWidth: 290,
-        }}>
-          <p style={{ margin: '0 0 14px 0', fontWeight: 700, fontSize: 14, color: '#e2e8f0' }}>🏠 Name this room</p>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className="canvas-dialog">
+          <p>🏠 Name this room</p>
+          <div className="canvas-dialog-row">
             <input
               autoFocus value={roomNameInput}
               onChange={(e) => setRoomNameInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && confirmRoomNameWithHistory()}
               placeholder="e.g. Bedroom, Kitchen…"
-              style={{
-                flex: 1, padding: '9px 13px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.07)', color: '#e2e8f0',
-                fontSize: 13, fontFamily: 'inherit', outline: 'none',
-              }}
             />
-            <button onClick={confirmRoomNameWithHistory} style={{
-              padding: '9px 18px', borderRadius: 8,
-              background: 'linear-gradient(135deg,#6b5b95,#9333ea)',
-              border: 'none', color: '#fff',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-            }}>Save</button>
+            <button onClick={confirmRoomNameWithHistory}>Save</button>
           </div>
         </div>
       )}
