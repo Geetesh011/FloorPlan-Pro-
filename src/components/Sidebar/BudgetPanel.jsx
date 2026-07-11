@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 
 const fmt = (n) =>
@@ -132,7 +132,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
                 </div>
               )}
             </div>
-            <div className="budget-donut" style={{ '--budget-donut-gradient': donutGradient }} />
+            <div className="budget-donut" style={{ background: donutGradient, borderRadius: '50%' }} />
           </div>
         </section>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
 import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow } from 'react-konva';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
@@ -62,10 +62,46 @@ function FurnitureIconImage({ url, width, height }) {
 
   if (!image) {
     // Soft placeholder while image loads (first render or if fetch is slow)
-    return <Rect width={width} height={height} fill="#e8e0f0" cornerRadius={4} opacity={0.5} />;
+    return <Rect width={width} height={height} fill="#e8e0f0" cornerRadius={4} opacity={0.5} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />;
   }
-  return <KonvaImage image={image} x={0} y={0} width={width} height={height} />;
+  return <KonvaImage image={image} x={0} y={0} width={width} height={height} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />;
 }
+
+// ── Memoized Furniture Item ───────────────────────────────────────────────
+const MemoizedFurnitureItem = React.memo(({
+  item,
+  catalogItem,
+  isSelected,
+  setRef,
+  onDragMove,
+  onDragEnd,
+  onTransformEnd,
+  onClick,
+  renderShape
+}) => {
+  return (
+    <Group
+      x={item.x} y={item.y} rotation={item.rotation ?? 0}
+      ref={setRef}
+      draggable
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      onTransformEnd={onTransformEnd}
+      onClick={onClick}
+    >
+      {catalogItem?.thumbnail
+        ? <FurnitureIconImage url={catalogItem.thumbnail} width={item.width} height={item.height} />
+        : renderShape(item)}
+      {isSelected && (
+        <Rect width={item.width} height={item.height}
+          stroke="#6b5b95" strokeWidth={2} dash={[4,4]} fill="rgba(107,91,149,0.06)"
+          perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+        />
+      )}
+    </Group>
+  );
+});
+
 
 function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, onSaveClick, onSaveAsClick, onLoadClick }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
@@ -349,11 +385,47 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     setSelectedId(null);
   };
 
-  const handleFurnitureDragEnd = (id, e) => {
-    const movingItem = placedFurniture.find((f) => f.id === id);
-    // Wall-snap first, grid-snap fallback — runs BEFORE collision check
+  const handleFurnitureDragMove = (id, e) => {
+    const node = e.target;
+    const movingItem = placedFurniture.find(f => f.id === id);
+    if (!movingItem) return;
+
+    // Live snap
     const { x: snappedX, y: snappedY } = applySnap(
-      e.target.x(), e.target.y(), movingItem.width, movingItem.height
+      node.x(), node.y(), movingItem.width, movingItem.height
+    );
+    node.position({ x: snappedX, y: snappedY });
+
+    // Live collision check
+    const collides = hasCollision(
+      id, snappedX, snappedY, movingItem.width, movingItem.height,
+      placedFurniture, movingItem.rotation ?? 0
+    );
+
+    // Zero-lag visual feedback using Konva node APIs
+    if (collides) {
+      node.opacity(0.6);
+      node.setAttr('wasColliding', true);
+    } else {
+      if (node.getAttr('wasColliding')) {
+        node.opacity(1);
+        node.setAttr('wasColliding', false);
+      }
+    }
+  };
+
+  const handleFurnitureDragEnd = (id, e) => {
+    const node = e.target;
+    const movingItem = placedFurniture.find((f) => f.id === id);
+    if (!movingItem) return;
+
+    // Reset visual feedback
+    node.opacity(1);
+    node.setAttr('wasColliding', false);
+
+    // Wall-snap first, grid-snap fallback
+    const { x: snappedX, y: snappedY } = applySnap(
+      node.x(), node.y(), movingItem.width, movingItem.height
     );
 
     const collides = hasCollision(
@@ -362,7 +434,9 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     );
 
     if (collides) {
-      e.target.position({ x: movingItem.x, y: movingItem.y });
+      // Revert to original position if dropped while colliding
+      node.position({ x: movingItem.x, y: movingItem.y });
+      node.getLayer()?.batchDraw();
       return;
     }
 
@@ -378,9 +452,26 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const handleFurnitureTransformEnd = (id, e) => {
     const node = e.target;
     const newRotation = node.rotation();
+    const movingItem = placedFurniture.find((f) => f.id === id);
+
     // Guard against Transformer accidentally scaling the node
     node.scaleX(1);
     node.scaleY(1);
+
+    if (!movingItem) return;
+
+    const collides = hasCollision(
+      id, movingItem.x, movingItem.y, movingItem.width, movingItem.height,
+      placedFurniture, newRotation
+    );
+
+    if (collides) {
+      // Revert to original rotation if collision happens
+      node.rotation(movingItem.rotation ?? 0);
+      node.getLayer()?.batchDraw();
+      return;
+    }
+
     pushHistory({ rooms, currentPoints, placedFurniture });
     setPlacedFurniture(prev =>
       prev.map(f => f.id === id ? { ...f, rotation: newRotation } : f)
@@ -478,6 +569,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           stroke={WALL_COLOR}
           strokeWidth={8}
           lineCap="round"
+          perfectDrawEnabled={false} shadowForStrokeEnabled={false}
         />
       );
       walls.push(
@@ -487,6 +579,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           stroke="#6B7280"
           strokeWidth={2}
           lineCap="round"
+          perfectDrawEnabled={false} shadowForStrokeEnabled={false}
         />
       );
 
@@ -567,71 +660,118 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     return { walls, labels };
   };
 
-  const renderFurnitureShape = (item) => {
+  const renderFurnitureShape = useCallback((item) => {
     const { width: w, height: h, color, catalogId } = item;
     switch (catalogId) {
       case 'bed-queen':
       case 'bed-single':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Line points={[4, h * 0.15, w - 4, h * 0.15]} stroke="#000" strokeWidth={1} />
-            <Rect x={w * 0.1} y={4} width={w * 0.35} height={h * 0.12} fill="#fff" stroke="#000" strokeWidth={1} />
-            <Rect x={w * 0.55} y={4} width={w * 0.35} height={h * 0.12} fill="#fff" stroke="#000" strokeWidth={1} />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[4, h * 0.15, w - 4, h * 0.15]} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Rect x={w * 0.1} y={4} width={w * 0.35} height={h * 0.12} fill="#fff" stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Rect x={w * 0.55} y={4} width={w * 0.35} height={h * 0.12} fill="#fff" stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'wardrobe':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Line points={[w / 2, 0, w / 2, h]} stroke="#000" strokeWidth={1} />
-            <Circle x={w / 2 - 6} y={h / 2} radius={2} fill="#000" />
-            <Circle x={w / 2 + 6} y={h / 2} radius={2} fill="#000" />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[w / 2, 0, w / 2, h]} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w / 2 - 6} y={h / 2} radius={2} fill="#000" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w / 2 + 6} y={h / 2} radius={2} fill="#000" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'desk':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Line points={[w * 0.15, 0, w * 0.15, h]} stroke="#000" strokeWidth={1} />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[w * 0.15, 0, w * 0.15, h]} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'chair':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Line points={[2, 2, w - 2, 2]} stroke="#000" strokeWidth={3} />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[2, 2, w - 2, 2]} stroke="#000" strokeWidth={3} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'sofa-2seat':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Line points={[2, 3, w - 2, 3]} stroke="#000" strokeWidth={4} />
-            <Line points={[w / 2, h * 0.25, w / 2, h]} stroke="#000" strokeWidth={1} />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[2, 3, w - 2, 3]} stroke="#000" strokeWidth={4} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Line points={[w / 2, h * 0.25, w / 2, h]} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'dining-table':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} cornerRadius={4} />
-            <Circle x={w * 0.2} y={-4} radius={3} fill="#6b5b95" />
-            <Circle x={w * 0.8} y={-4} radius={3} fill="#6b5b95" />
-            <Circle x={w * 0.2} y={h + 4} radius={3} fill="#6b5b95" />
-            <Circle x={w * 0.8} y={h + 4} radius={3} fill="#6b5b95" />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} cornerRadius={4} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w * 0.2} y={-4} radius={3} fill="#6b5b95" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w * 0.8} y={-4} radius={3} fill="#6b5b95" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w * 0.2} y={h + 4} radius={3} fill="#6b5b95" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Circle x={w * 0.8} y={h + 4} radius={3} fill="#6b5b95" perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       case 'tv-unit':
         return (
           <>
-            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />
-            <Rect x={w * 0.25} y={-h * 0.6} width={w * 0.5} height={h * 0.6} fill="#111" stroke="#000" strokeWidth={1} />
+            <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
+            <Rect x={w * 0.25} y={-h * 0.6} width={w * 0.5} height={h * 0.6} fill="#111" stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
           </>
         );
       default:
-        return <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} />;
+        return <Rect width={w} height={h} fill={color} stroke="#000" strokeWidth={1} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />;
     }
-  };
+  }, []);
+
+  const staticRoomShapes = useMemo(() => {
+    return rooms.map((room, ri) => {
+      const floorPoints = room.points.flatMap(p => [p.x, p.y]);
+      const { walls, labels } = buildWallsAndLabels(room.points, `room${ri}`);
+      const centerX = room.points.reduce((s, p) => s + p.x, 0) / room.points.length;
+      const centerY = room.points.reduce((s, p) => s + p.y, 0) / room.points.length;
+      return (
+        <React.Fragment key={`room-fragment-${ri}`}>
+          <Line
+            key={`floor-${ri}`}
+            points={floorPoints}
+            closed
+            fill="#d2a96e"
+            stroke="#334155"
+            strokeWidth={3}
+            shadowColor="#000"
+            shadowBlur={12}
+            shadowOpacity={0.12}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+          />
+          {walls}
+          {labels}
+          <Text
+            key={`rl-${ri}`}
+            x={centerX - 40}
+            y={centerY - 10}
+            text={room.label}
+            fontSize={14}
+            fontStyle="bold"
+            fill="#1f2937"
+            perfectDrawEnabled={false}
+          />
+        </React.Fragment>
+      );
+    });
+  }, [rooms]);
+
+  // Handlers wrapped in useCallback to preserve furniture memoization
+  const handleFurnitureDragMoveCb = useCallback((id, e) => handleFurnitureDragMove(id, e), [placedFurniture, rooms, currentPoints]);
+  const handleFurnitureDragEndCb = useCallback((id, e) => handleFurnitureDragEnd(id, e), [placedFurniture, rooms, currentPoints]);
+  const handleFurnitureTransformEndCb = useCallback((id, e) => handleFurnitureTransformEnd(id, e), [placedFurniture, rooms, currentPoints]);
+  const handleFurnitureClickCb = useCallback((e, id) => {
+    e.cancelBubble = true;
+    setSelectedId(id);
+  }, []);
 
   const lastPoint = currentPoints[currentPoints.length - 1];
   const previewLine = lastPoint && mousePos
@@ -750,55 +890,24 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           <Layer>
             {gridLines}
 
-            {rooms.map((room, ri) => {
-              const floorPoints = room.points.flatMap(p => [p.x, p.y]);
-              const { walls, labels } = buildWallsAndLabels(room.points, `room${ri}`);
-              const centerX = room.points.reduce((s, p) => s + p.x, 0) / room.points.length;
-              const centerY = room.points.reduce((s, p) => s + p.y, 0) / room.points.length;
-              return (
-                <React.Fragment key={`room-fragment-${ri}`}>
-                  <Line
-                    key={`floor-${ri}`}
-                    points={floorPoints}
-                    closed
-                    fill="#d2a96e"
-                    stroke="#334155"
-                    strokeWidth={3}
-                    shadowColor="#000"
-                    shadowBlur={12}
-                    shadowOpacity={0.12}
-                  />
-                  {walls}
-                  {labels}
-                  <Text
-                    key={`rl-${ri}`}
-                    x={centerX - 40}
-                    y={centerY - 10}
-                    text={room.label}
-                    fontSize={14}
-                    fontStyle="bold"
-                    fill="#1f2937"
-                  />
-                </React.Fragment>
-              );
-            })}
+            {staticRoomShapes}
 
             {pendingRoom && (() => {
               const fp = pendingRoom.points.flatMap(p => [p.x, p.y]);
               const { walls, labels } = buildWallsAndLabels(pendingRoom.points, 'pending');
               return (
                 <>
-                  <Line points={fp} closed fill="rgba(251,191,36,0.15)" stroke="#f59e0b" strokeWidth={2} dash={[6,6]} />
+                  <Line points={fp} closed fill="rgba(251,191,36,0.15)" stroke="#f59e0b" strokeWidth={2} dash={[6,6]} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
                   {walls}{labels}
                 </>
               );
             })()}
 
             {currentPoints.length > 1 && (
-              <Line points={currentPoints.flatMap(p => [p.x, p.y])} stroke="#334155" strokeWidth={2} />
+              <Line points={currentPoints.flatMap(p => [p.x, p.y])} stroke="#334155" strokeWidth={2} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
             )}
             {previewLine && (
-              <Line points={previewLine} stroke="#94a3b8" strokeWidth={1.5} dash={[6,6]} />
+              <Line points={previewLine} stroke="#94a3b8" strokeWidth={1.5} dash={[6,6]} perfectDrawEnabled={false} shadowForStrokeEnabled={false} />
             )}
 
             {currentPoints.map((p, i) => {
@@ -809,30 +918,30 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
                   fill={highlight ? '#22c55e' : '#ef4444'}
                   stroke={highlight ? '#15803d' : '#fff'}
                   strokeWidth={highlight ? 2 : 1.5}
+                  perfectDrawEnabled={false} shadowForStrokeEnabled={false}
                 />
               );
             })}
+          </Layer>
 
+          {/* ── Furniture Layer (Dynamic) ── */}
+          <Layer>
             {placedFurniture.map((item) => {
               const catalogItem = FURNITURE_CATALOG.find(f => f.id === item.catalogId);
               const isSelected = item.id === selectedId;
               return (
-                <Group
-                  key={item.id} x={item.x} y={item.y} rotation={item.rotation ?? 0}
-                  ref={(node) => { if (node) furnitureGroupRefs.current[item.id] = node; }}
-                  draggable
-                  onDragEnd={(e) => handleFurnitureDragEnd(item.id, e)}
-                  onTransformEnd={(e) => handleFurnitureTransformEnd(item.id, e)}
-                  onClick={(e) => { e.cancelBubble = true; setSelectedId(item.id); }}
-                >
-                  {catalogItem?.icon
-                    ? <FurnitureIconImage url={catalogItem.icon} width={item.width} height={item.height} />
-                    : renderFurnitureShape(item)}
-                  {isSelected && (
-                    <Rect width={item.width} height={item.height}
-                      stroke="#6b5b95" strokeWidth={2} dash={[4,4]} fill="rgba(107,91,149,0.06)" />
-                  )}
-                </Group>
+                <MemoizedFurnitureItem
+                  key={item.id}
+                  item={item}
+                  catalogItem={catalogItem}
+                  isSelected={isSelected}
+                  renderShape={renderFurnitureShape}
+                  setRef={(node) => { if (node) furnitureGroupRefs.current[item.id] = node; }}
+                  onDragMove={(e) => handleFurnitureDragMoveCb(item.id, e)}
+                  onDragEnd={(e) => handleFurnitureDragEndCb(item.id, e)}
+                  onTransformEnd={(e) => handleFurnitureTransformEndCb(item.id, e)}
+                  onClick={(e) => handleFurnitureClickCb(e, item.id)}
+                />
               );
             })}
 

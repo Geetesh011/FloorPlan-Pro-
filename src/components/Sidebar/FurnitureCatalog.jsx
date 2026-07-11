@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 
 const LEFT_RAIL = [
@@ -21,7 +21,7 @@ function FurnitureCatalog({ onSelectFurniture }) {
   const query = search.toLowerCase().trim();
   const filteredItems = FURNITURE_CATALOG.filter((item) => {
     const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
-    const matchesSearch = !query || item.name.toLowerCase().includes(query);
+    const matchesSearch = !query || item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
   });
 
@@ -81,7 +81,7 @@ function FurnitureCatalog({ onSelectFurniture }) {
                 onClick={() => handleSelect(item)}
               >
                 <div className="catalog-thumb">
-                  <img src={item.icon} alt={item.name} />
+                  <img src={item.thumbnail} alt={item.name} />
                 </div>
                 <div className="catalog-item-name">{item.name}</div>
               </button>
