@@ -37,6 +37,7 @@ function App() {
   const [designs,     setDesigns]     = useState([]);
   const [loadingList, setLoadingList] = useState(false);
   const [toast,       setToast]       = useState(null);
+  const [shareOpen,   setShareOpen]   = useState(false);
 
   // ── Toast ─────────────────────────────────────────────────────────────
   const showToast = useCallback((msg, ok = true) => {
@@ -126,13 +127,58 @@ function App() {
     <div className="app-shell">
       <header className="app-top-bar">
         <div className="app-top-brand">
-          <span className="app-logo">Planner 5D</span>
-          <span className="app-breadcrumb">My Projects <span className="breadcrumb-sep">›</span> Living Room</span>
+          <span className="app-logo">FloorPlan Pro</span>
         </div>
         <div className="app-top-actions">
-          <button type="button" className="top-pill">3D</button>
-          <button type="button" className="top-pill">VR</button>
-          <button type="button" className="top-pill primary">Save</button>
+          <button 
+            type="button" 
+            className="top-pill" 
+            onClick={quickSave}
+            title="Save Project"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#6366f1', border: '1px solid #e2e8f0', padding: '8px 12px' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          </button>
+          <div style={{ position: 'relative' }}>
+            <button 
+              type="button" 
+              className="top-pill" 
+              onClick={() => setShareOpen(!shareOpen)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', color: '#22c55e', border: '1px solid #e2e8f0', padding: '8px 12px' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </button>
+            {shareOpen && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '8px', width: '240px', zIndex: 100, fontFamily: 'Inter, system-ui, sans-serif' }}>
+                <div style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontWeight: 500 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                  Print
+                </div>
+                <div style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontWeight: 500 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                  Share Project
+                </div>
+                <div style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: '10px' }}>
+                  <div style={{ color: '#64748b', marginTop: '2px' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 500, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>Export DWG <span style={{ fontSize: '10px', fontWeight: 700, border: '1px solid #0ea5e9', color: '#0ea5e9', padding: '1px 6px', borderRadius: '10px' }}>PRO</span></div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Fully compatible with AutoCAD</div>
+                  </div>
+                </div>
+                <div style={{ padding: '10px 12px', cursor: 'pointer', display: 'flex', gap: '10px' }}>
+                  <div style={{ color: '#64748b', marginTop: '2px' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 500, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>Export DXF <span style={{ fontSize: '10px', fontWeight: 700, border: '1px solid #0ea5e9', color: '#0ea5e9', padding: '1px 6px', borderRadius: '10px' }}>PRO</span></div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Supported by AutoCAD, ArchiCAD, Revit and etc</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="top-avatar">V</div>
         </div>
       </header>

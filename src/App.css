@@ -17,8 +17,8 @@
   --room-wall: #334155;
   --room-wall-dark: #1f2937;
   --room-outline: #4b5563;
-  --font-family: 'Manrope', 'Inter', 'Segoe UI', Roboto, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Poppins', 'Manrope', 'Inter', 'Segoe UI', sans-serif;
+  --font-family: 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
 }
 
 body {
@@ -32,7 +32,7 @@ body {
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
   background: linear-gradient(180deg, #fcfaf7 0%, #f3ece0 100%);
   overflow: hidden;
@@ -65,6 +65,12 @@ body {
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: #111827;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.app-logo:hover {
+  color: #22c55e;
 }
 
 .app-breadcrumb {
@@ -96,10 +102,17 @@ body {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+}
+
+.top-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  filter: brightness(0.96);
 }
 
 .top-pill.primary {
-  background: linear-gradient(135deg, #6b5b95, #9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   border-color: transparent;
 }
@@ -113,6 +126,13 @@ body {
   display: grid;
   place-items: center;
   font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.top-avatar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15,23,42,0.25);
 }
 
 .app-content {
@@ -120,7 +140,8 @@ body {
   flex: 1;
   gap: 18px;
   padding: 20px 24px 24px;
-  min-height: calc(100vh - 72px);
+  height: calc(100vh - 72px);
+  min-height: 0;
 }
 
 .app-sidebar-left {
@@ -136,8 +157,6 @@ body {
 }
 
 .app-sidebar-right {
-  width: 360px;
-  min-width: 360px;
   display: flex;
   flex-direction: column;
 }
@@ -188,6 +207,7 @@ body {
   border-bottom: 1px solid rgba(15,23,42,0.08);
   box-shadow: inset 0 -1px 0 rgba(255,255,255,0.65);
   z-index: 10;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .canvas-top-bar .canvas-action-button {
@@ -199,9 +219,10 @@ body {
   border: 1px solid rgba(15,23,42,0.08);
   background: #fff;
   color: #334155;
-  font-size: 12px;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 13px;
   font-weight: 600;
-  padding: 0 12px;
+  padding: 0 14px;
   min-height: 36px;
   cursor: pointer;
   transition: all 0.18s ease;
@@ -214,7 +235,7 @@ body {
 }
 
 .canvas-top-bar .canvas-action-button.primary {
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: #22c55e;
   border-color: transparent;
   color: #fff;
 }
@@ -256,7 +277,7 @@ body {
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(135deg, #6b5b95, #9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   border-radius: 999px;
   padding: 8px 20px;
@@ -329,7 +350,7 @@ body {
   padding: 10px 14px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -366,7 +387,7 @@ body {
 }
 
 .app-modal-header.save {
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
 }
 
 .app-modal-header.load {
@@ -456,7 +477,7 @@ body {
 }
 
 .app-modal-button.primary {
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
 }
 
 .app-modal-button.primary.disabled {
@@ -492,7 +513,7 @@ body {
   height: 40px;
   border-radius: 12px;
   flex-shrink: 0;
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -519,7 +540,7 @@ body {
 .saved-design-load {
   padding: 6px 14px;
   border-radius: 10px;
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   border: none;
   color: #fff;
   font-size: 11px;
@@ -693,7 +714,7 @@ body {
 .catalog-rail-button {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: rgba(255,255,255,0.7);
   color: #334155;
@@ -707,7 +728,7 @@ body {
 
 .catalog-rail-button:hover,
 .catalog-rail-button.active {
-  background: linear-gradient(135deg, #6b5b95, #9333ea);
+  background: #22c55e;
   color: #fff;
   border-color: transparent;
   transform: translateY(-1px);
@@ -754,10 +775,16 @@ body {
   gap: 10px;
   background: rgba(255,255,255,0.9);
   border: 1px solid rgba(15,23,42,0.08);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 999px;
+  padding: 10px 16px;
   margin-bottom: 12px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  transition: all 0.2s ease;
+}
+
+.catalog-search:hover,
+.catalog-search:focus-within {
+  box-shadow: 0 0 0 4px rgba(34,197,94,0.15), inset 0 1px 0 rgba(255,255,255,0.7);
 }
 
 .catalog-search input {
@@ -781,6 +808,23 @@ body {
   gap: 10px;
   overflow-y: auto;
   padding-bottom: 12px;
+  /* Required so grid shrinks properly in flex container */
+  min-height: 0;
+}
+
+/* Subtle scrollbar for the catalog grid */
+.catalog-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.catalog-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.catalog-grid::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+  border-radius: 10px;
+}
+.catalog-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
 }
 
 .catalog-card {
@@ -804,7 +848,7 @@ body {
 }
 
 .catalog-card.active {
-  background: linear-gradient(135deg, #6b5b95, #9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   border-color: transparent;
   color: #fff;
 }
@@ -898,7 +942,7 @@ body {
 }
 
 .catalog-tab.active {
-  background: linear-gradient(135deg,#6b5b95,#9333ea);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #fff;
 }
 
@@ -912,6 +956,37 @@ body {
   box-shadow: 0 18px 46px rgba(15,23,42,0.10);
   overflow: hidden;
   border: 1px solid rgba(15,23,42,0.06);
+  width: 360px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.budget-panel.collapsed {
+  width: 0px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  margin: 0;
+  flex: 0;
+}
+
+.floating-collapse-btn {
+  position: absolute;
+  right: 20px;
+  top: 80px;
+  z-index: 1000;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: 14px;
+  color: #334155;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .budget-headline {
@@ -1173,6 +1248,7 @@ body {
   font-size: 11px;
   color: rgba(51,65,85,0.65);
   letter-spacing: 0.5px;
+  font-family: 'Inter', system-ui, sans-serif !important;
 }
 
 .canvas-top-separator {

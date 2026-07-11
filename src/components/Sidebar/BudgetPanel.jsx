@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 
 const fmt = (n) =>
@@ -35,10 +35,12 @@ function ItemRow({ item, onPriceChange, onRemove }) {
 
   return (
     <div className="budget-item-card">
-      <div className={`budget-item-thumb ${categoryClass}`} />
+      <div className={`budget-item-thumb ${categoryClass}`}>
+        {catalogItem?.thumbnail && <img src={catalogItem.thumbnail} alt={item.name} style={{ width: '75%', height: '75%', objectFit: 'contain' }} />}
+      </div>
       <div className="budget-item-meta">
-        <div className="budget-item-title">{item.name}</div>
-        <div className="budget-item-subtitle">{category}</div>
+        <div className="budget-item-title" style={{ fontWeight: '500', fontSize: '1rem' }}>{item.name}</div>
+        <div className="budget-item-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)' }}>{category}</div>
       </div>
       <div className="budget-item-controls">
         {editing ? (
@@ -73,6 +75,14 @@ function ItemRow({ item, onPriceChange, onRemove }) {
 function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
   const [collapsed, setCollapsed] = useState(false);
 
+  const prevFurnitureCount = useRef(placedFurniture.length);
+  useEffect(() => {
+    if (placedFurniture.length > prevFurnitureCount.current) {
+      setCollapsed(false);
+    }
+    prevFurnitureCount.current = placedFurniture.length;
+  }, [placedFurniture.length]);
+
   const { total, byCategory, itemCount } = useMemo(() => {
     let tot = 0;
     const cats = {};
@@ -100,11 +110,22 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
     : 'rgba(229,231,235,0.85)';
 
   return (
-    <aside className={`budget-panel${collapsed ? ' collapsed' : ''}`}>
+    <>
+      {collapsed && (
+        <button
+          type="button"
+          className="floating-collapse-btn"
+          onClick={() => setCollapsed(false)}
+          title="Expand budget"
+        >
+          ◀
+        </button>
+      )}
+      <aside className={`budget-panel${collapsed ? ' collapsed' : ''}`}>
       <div className="budget-headline">
         <div>
-          <h2>Budget Estimate</h2>
-          <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>Budget Estimate</h2>
+          <span style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem' }}>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
         </div>
         <button
           type="button"
@@ -120,14 +141,14 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
         <section className="budget-section">
           <div className="budget-total-card">
             <div>
-              <div className="budget-total-label">Total Estimate</div>
-              <div className="budget-total-value">{fmt(total)}</div>
+              <div className="budget-total-label" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Total Estimate</div>
+              <div className="budget-total-value" style={{ fontWeight: '700', fontSize: '2rem', letterSpacing: '-0.02em' }}>{fmt(total)}</div>
               {itemCount === 0 ? (
-                <div className="budget-summary-hint">
+                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                   Add furniture to start seeing your estimate.
                 </div>
               ) : (
-                <div className="budget-summary-hint">
+                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                   {itemCount} item{itemCount !== 1 ? 's' : ''} placed in room.
                 </div>
               )}
@@ -138,7 +159,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
 
         {Object.keys(byCategory).length > 0 && (
           <section className="budget-section">
-            <div className="budget-section-heading">Category Breakdown</div>
+            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Category Breakdown</div>
             <div className="budget-legend">
               {Object.entries(byCategory).map(([cat, amount]) => {
                 const legendClass = `category-${cat.toLowerCase().replace(/\s+/g, '-')}`;
@@ -156,7 +177,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
 
         {placedFurniture.length > 0 ? (
           <section className="budget-section">
-            <div className="budget-section-heading">Items</div>
+            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Items in room</div>
             {placedFurniture.map((item) => (
               <ItemRow key={item.id} item={item} onPriceChange={onPriceChange} onRemove={onRemove} />
             ))}
@@ -164,8 +185,8 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
         ) : (
           <div className="budget-empty-state">
             <div className="budget-empty-icon">🛋️</div>
-            <div className="budget-empty-title">No furniture in the room yet</div>
-            <div className="budget-empty-copy">
+            <div className="budget-empty-title" style={{ fontWeight: '500', fontSize: '1rem', marginTop: '1rem' }}>No furniture in the room yet</div>
+            <div className="budget-empty-copy" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem', textAlign: 'center' }}>
               Drag a furniture item from the left panel onto the canvas to preview cost and budget breakdown.
             </div>
           </div>
@@ -176,6 +197,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove }) {
         <div className="budget-collapsed-pill">Budget {fmt(total)}</div>
       )}
     </aside>
+    </>
   );
 }
 

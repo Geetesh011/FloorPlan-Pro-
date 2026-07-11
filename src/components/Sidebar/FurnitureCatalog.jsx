@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 
 const LEFT_RAIL = [
-  { label: 'Rooms', icon: '🏠' },
-  { label: 'Construction', icon: '🧱' },
   { label: 'Interior', icon: '🛋' },
-  { label: 'Exterior', icon: '🌳' },
 ];
 
 const CATEGORIES = [
@@ -38,7 +35,7 @@ function FurnitureCatalog({ onSelectFurniture }) {
           <button
             key={item.label}
             type="button"
-            className={`catalog-rail-button${index === 2 ? ' active' : ''}`}
+            className={`catalog-rail-button${index === 0 ? ' active' : ''}`}
             title={item.label}
           >
             {item.icon}
@@ -49,8 +46,8 @@ function FurnitureCatalog({ onSelectFurniture }) {
       <div className="catalog-panel">
         <div className="catalog-header">
           <div>
-            <div className="catalog-title">Furniture</div>
-            <div className="catalog-subtitle">Tap an item to place it in your room</div>
+            <div className="catalog-title" style={{ fontSize: '1.25rem', fontWeight: '700', letterSpacing: '-0.01em', margin: 0 }}>Furniture</div>
+            <div className="catalog-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Tap an item to place it in your room</div>
           </div>
         </div>
 
@@ -68,7 +65,7 @@ function FurnitureCatalog({ onSelectFurniture }) {
 
         <div className="catalog-grid">
           {filteredItems.length === 0 ? (
-            <div className="catalog-no-results">
+            <div className="catalog-no-results" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', textAlign: 'center', padding: '2rem' }}>
               No items match "{search}"
             </div>
           ) : filteredItems.map((item) => {
@@ -83,29 +80,13 @@ function FurnitureCatalog({ onSelectFurniture }) {
                 <div className="catalog-thumb">
                   <img src={item.thumbnail} alt={item.name} />
                 </div>
-                <div className="catalog-item-name">{item.name}</div>
+                <div className="catalog-item-name" style={{ fontWeight: '500', fontSize: '1rem' }}>{item.name}</div>
               </button>
             );
           })}
         </div>
 
-        <div className="catalog-categories">
-          {CATEGORIES.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={`catalog-category-item${category === activeCategory ? ' active' : ''}`}
-              onClick={() => setActiveCategory(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
 
-        <div className="catalog-tab-toggle">
-          <button type="button" className="catalog-tab active">Catalog</button>
-          <button type="button" className="catalog-tab">Brand Kits</button>
-        </div>
       </div>
     </div>
   );

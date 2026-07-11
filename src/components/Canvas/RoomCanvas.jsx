@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
-import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow } from 'react-konva';
+import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow, Shape } from 'react-konva';
+import useImage from 'use-image';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
+import woodTextureImg from '../../assets/textures/wood_floor.png';
+import { useImage } from 'react-konva-utils';
+import woodFloorTexture from '../../assets/floors/wood-oak-floor.png';
 
 const GRID_SIZE = 20;
 const PIXELS_PER_FOOT = 20;
@@ -102,6 +106,31 @@ const MemoizedFurnitureItem = React.memo(({
   );
 });
 
+const [floorImage] = useImage(woodFloorTexture);
+
+const GRID_RANGE = 3000;
+const GridShape = () => (
+  <Shape
+    sceneFunc={(ctx, shape) => {
+      ctx.beginPath();
+      for (let x = -GRID_RANGE; x <= GRID_RANGE; x += GRID_SIZE) {
+        ctx.moveTo(x, -GRID_RANGE);
+        ctx.lineTo(x, GRID_RANGE);
+      }
+      for (let y = -GRID_RANGE; y <= GRID_RANGE; y += GRID_SIZE) {
+        ctx.moveTo(-GRID_RANGE, y);
+        ctx.lineTo(GRID_RANGE, y);
+      }
+      // Konva's strokeShape automatically applies the stroke/strokeWidth props below
+      ctx.fillStrokeShape(shape);
+    }}
+    stroke="#e2e6ec"
+    strokeWidth={0.5}
+    listening={false}
+    perfectDrawEnabled={false}
+    shadowForStrokeEnabled={false}
+  />
+);
 
 function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, onSaveClick, onSaveAsClick, onLoadClick }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
@@ -121,6 +150,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const [roomNameInput, setRoomNameInput] = useState('');
   // placedFurniture + setPlacedFurniture are now props (shared with BudgetPanel via App)
   const [selectedId, setSelectedId] = useState(null);
+
+  const [woodPattern] = useImage(woodTextureImg);
 
   // ── Undo history ────────────────────────────────────────────────────────────
   // Each entry is a full snapshot: { rooms, currentPoints, placedFurniture }.
@@ -191,14 +222,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
-  // ── Infinite grid: large static range so panning never reveals a gap ──────
-  // 3000px world-units ≈ 150 ft in each direction from origin (300 lines each axis)
-  const GRID_RANGE = 3000;
-  const gridLines = [];
-  for (let x = -GRID_RANGE; x <= GRID_RANGE; x += GRID_SIZE)
-    gridLines.push(<Line key={`v-${x}`} points={[x, -GRID_RANGE, x, GRID_RANGE]} stroke="#e2e6ec" strokeWidth={0.5} listening={false} />);
-  for (let y = -GRID_RANGE; y <= GRID_RANGE; y += GRID_SIZE)
-    gridLines.push(<Line key={`h-${y}`} points={[-GRID_RANGE, y, GRID_RANGE, y]} stroke="#e2e6ec" strokeWidth={0.5} listening={false} />);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const rectsOverlap = (a, b) => {
     return (
@@ -501,13 +525,17 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   // Attach / detach the Transformer whenever the selected furniture item changes.
   useEffect(() => {
     if (!transformerRef.current) return;
-    if (selectedId && furnitureGroupRefs.current[selectedId]) {
+    const isStillPlaced = placedFurniture.some(f => f.id === selectedId);
+    if (selectedId && isStillPlaced && furnitureGroupRefs.current[selectedId]) {
       transformerRef.current.nodes([furnitureGroupRefs.current[selectedId]]);
     } else {
       transformerRef.current.nodes([]);
+      if (selectedId && !isStillPlaced) {
+        setSelectedId(null);
+      }
     }
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedId]);
+  }, [selectedId, placedFurniture]);
 
   // Push history before confirming a room name so the completed room is undoable.
   const confirmRoomNameWithHistory = () => {
@@ -567,8 +595,9 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           key={`${keyPrefix}-w-${i}`}
           points={[p1.x, p1.y, p2.x, p2.y]}
           stroke={WALL_COLOR}
-          strokeWidth={8}
-          lineCap="round"
+          strokeWidth={6}
+          lineCap="square"
+          lineJoin="miter"
           perfectDrawEnabled={false} shadowForStrokeEnabled={false}
         />
       );
@@ -650,9 +679,9 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         <Text key={`${keyPrefix}-txt-${i}`}
           x={textX} y={textY}
           text={label}
-          fontSize={10} fontStyle="bold"
-          fill={TEXT_COLOR}
-          fontFamily="'Segoe UI', system-ui, sans-serif"
+          fontSize={10} fontStyle="normal"
+          fill="#64748b"
+          fontFamily="Inter, system-ui, sans-serif"
           width={textW} align="center"
         />
       );
@@ -738,9 +767,12 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             key={`floor-${ri}`}
             points={floorPoints}
             closed
+            fillPatternImage={woodPattern}
+            fillPatternRepeat="repeat"
+            fillPatternScale={{ x: 0.2, y: 0.2 }}
             fill="#d2a96e"
             stroke="#334155"
-            strokeWidth={3}
+            strokeWidth={1}
             shadowColor="#000"
             shadowBlur={12}
             shadowOpacity={0.12}
@@ -755,14 +787,15 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             y={centerY - 10}
             text={room.label}
             fontSize={14}
-            fontStyle="bold"
+            fontStyle="500"
+            fontFamily="Inter, system-ui, sans-serif"
             fill="#1f2937"
             perfectDrawEnabled={false}
           />
         </React.Fragment>
       );
     });
-  }, [rooms]);
+  }, [rooms, woodPattern]);
 
   // Handlers wrapped in useCallback to preserve furniture memoization
   const handleFurnitureDragMoveCb = useCallback((id, e) => handleFurnitureDragMove(id, e), [placedFurniture, rooms, currentPoints]);
@@ -795,40 +828,6 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       {/* ══════════ TOP BAR — Planner5D style ══════════ */}
       <div className="canvas-top-bar">
 
-        {/* ── Draw action ── */}
-        <button
-          type="button"
-          onClick={finishRoom}
-          className="canvas-action-button primary canvas-top-action"
-          title="Finish drawing room"
-        >
-          ✦ Finish Room
-        </button>
-
-        <div className="canvas-top-separator" />
-
-        {/* ── Save / Load ── */}
-        <button
-          type="button"
-          onClick={onSaveClick}
-          title="Quick save (Ctrl+S)"
-          className="canvas-icon-button success"
-        >💾</button>
-        <button
-          type="button"
-          onClick={onSaveAsClick}
-          title="Save As… (Ctrl+Shift+S)"
-          className="canvas-icon-button secondary"
-        >AS</button>
-        <button
-          type="button"
-          onClick={onLoadClick}
-          title="Load a saved design (Ctrl+O)"
-          className="canvas-icon-button info"
-        >📂</button>
-
-        <div className="canvas-top-separator" />
-
         <button
           type="button"
           onClick={undo}
@@ -836,19 +835,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           title="Undo (Ctrl+Z)"
           className="canvas-icon-button"
         >
-          ↩
-        </button>
-
-        <div className="canvas-top-separator" />
-
-        <button
-          type="button"
-          onClick={handleDeleteSelected}
-          disabled={!selectedId}
-          title="Delete selected item"
-          className="canvas-icon-button danger"
-        >
-          
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
         </button>
 
         <button
@@ -871,8 +858,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
 
         {/* Placement hint toast */}
         {pendingFurniture && (
-          <div className="canvas-toast">
-            📐 Click to place: <strong>{pendingFurniture.name}</strong>
+          <div className="canvas-toast" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)' }}>
+            📐 Click to place: <strong style={{ fontWeight: '500', color: 'var(--text-primary, #f8fafc)' }}>{pendingFurniture.name}</strong>
           </div>
         )}
 
@@ -888,7 +875,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
           className="canvas-stage"
         >
           <Layer>
-            {gridLines}
+            <GridShape />
 
             {staticRoomShapes}
 
@@ -936,7 +923,10 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
                   catalogItem={catalogItem}
                   isSelected={isSelected}
                   renderShape={renderFurnitureShape}
-                  setRef={(node) => { if (node) furnitureGroupRefs.current[item.id] = node; }}
+                  setRef={(node) => { 
+                    if (node) furnitureGroupRefs.current[item.id] = node; 
+                    else delete furnitureGroupRefs.current[item.id];
+                  }}
                   onDragMove={(e) => handleFurnitureDragMoveCb(item.id, e)}
                   onDragEnd={(e) => handleFurnitureDragEndCb(item.id, e)}
                   onTransformEnd={(e) => handleFurnitureTransformEndCb(item.id, e)}
