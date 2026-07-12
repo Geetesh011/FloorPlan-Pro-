@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import Canvas from './components/Canvas/RoomCanvas';
-import FurnitureCatalog from './components/Sidebar/FurnitureCatalog';
+import LeftSidebar from './components/Sidebar/LeftSidebar';
 import BudgetPanel from './components/Sidebar/BudgetPanel';
 import {
   getOrCreateUserId, saveDesign, listDesigns,
@@ -23,6 +23,7 @@ function App() {
   const [rooms,            setRooms]            = useState([]);
   const [pendingFurniture, setPendingFurniture] = useState(null);
   const [placedFurniture,  setPlacedFurniture]  = useState([]);
+  const [selectedRoomIndex, setSelectedRoomIndex] = useState(null);
 
   // Refs for keyboard handler (avoids stale closure)
   const roomsRef           = useRef(rooms);
@@ -185,7 +186,12 @@ function App() {
 
       <div className="app-content">
         <div className="app-sidebar-left">
-          <FurnitureCatalog onSelectFurniture={setPendingFurniture} />
+          <LeftSidebar
+            onSelectFurniture={setPendingFurniture}
+            rooms={rooms}
+            setRooms={setRooms}
+            selectedRoomIndex={selectedRoomIndex}
+          />
         </div>
 
         <div className="app-canvas-area">
@@ -196,6 +202,8 @@ function App() {
             setPlacedFurniture={setPlacedFurniture}
             rooms={rooms}
             setRooms={setRooms}
+            selectedRoomIndex={selectedRoomIndex}
+            setSelectedRoomIndex={setSelectedRoomIndex}
             onSaveClick={quickSave}
             onSaveAsClick={() => { setSaveName(''); setModal('save'); }}
             onLoadClick={openLoadModal}

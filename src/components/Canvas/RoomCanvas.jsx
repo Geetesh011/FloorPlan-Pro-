@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
 import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow, Shape } from 'react-konva';
-import useImage from 'use-image';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
-import woodTextureImg from '../../assets/textures/wood_floor.png';
+import { FLOOR_TEXTURES } from '../../data/floorTextures';
 
 const GRID_SIZE = 20;
 const PIXELS_PER_FOOT = 20;
@@ -129,7 +128,7 @@ const GridShape = () => (
   />
 );
 
-function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, onSaveClick, onSaveAsClick, onLoadClick }) {
+function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
   const containerRef = useRef(null);
   const stageRef = useRef(null);           // ref to Konva Stage for zoom controls
@@ -145,10 +144,18 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const CLOSE_THRESHOLD = 20; // px — snap-to-start radius
   const [pendingRoom, setPendingRoom] = useState(null);
   const [roomNameInput, setRoomNameInput] = useState('');
-  // placedFurniture + setPlacedFurniture are now props (shared with BudgetPanel via App)
   const [selectedId, setSelectedId] = useState(null);
 
-  const [woodPattern] = useImage(woodTextureImg);
+  const [loadedTextures, setLoadedTextures] = useState({});
+  useEffect(() => {
+    FLOOR_TEXTURES.forEach((tex) => {
+      const img = new window.Image();
+      img.onload = () => {
+        setLoadedTextures((prev) => ({ ...prev, [tex.id]: img }));
+      };
+      img.src = tex.thumbnail;
+    });
+  }, []);
 
   // ── Undo history ────────────────────────────────────────────────────────────
   // Each entry is a full snapshot: { rooms, currentPoints, placedFurniture }.
@@ -296,6 +303,12 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const handleStageClick = (e) => {
     // Ignore clicks that were actually a pan drag
     if (e.target.getStage().isDragging()) return;
+
+    // If clicking on empty stage (e.target === Stage), clear selections
+    if (e.target === e.target.getStage()) {
+      setSelectedId(null);
+      if (setSelectedRoomIndex) setSelectedRoomIndex(null);
+    }
 
     if (pendingFurniture) {
       // getRelativePointerPosition returns WORLD coords (undoes pan + zoom)
@@ -467,35 +480,51 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     ));
   };
 
-  // Called when the Transformer finishes a rotation gesture.
-  // Resets any accidental scale the Transformer may have applied, then
-  // saves the new rotation angle (degrees) into furniture state.
+  // Called when the Transformer finishes a rotation or scale gesture.
+  // Resets scale to 1, computes new dimensions, and checks collisions.
   const handleFurnitureTransformEnd = (id, e) => {
     const node = e.target;
     const newRotation = node.rotation();
-    const movingItem = placedFurniture.find((f) => f.id === id);
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
 
-    // Guard against Transformer accidentally scaling the node
+    const movingItem = placedFurniture.find((f) => f.id === id);
+    if (!movingItem) return;
+
+    // Fetch baseline catalog dimensions
+    const catalogItem = FURNITURE_CATALOG.find((c) => c.id === movingItem.catalogId);
+    const baseWidth = catalogItem ? catalogItem.width * PIXELS_PER_FOOT : movingItem.width;
+    const baseHeight = catalogItem ? catalogItem.height * PIXELS_PER_FOOT : movingItem.height;
+
+    // Calculate requested new dimensions based on scale
+    let newWidth = movingItem.width * scaleX;
+    let newHeight = movingItem.height * scaleY;
+
+    // Clamp dimensions to 50% - 200% of the baseline catalog size
+    newWidth = Math.max(baseWidth * 0.5, Math.min(baseWidth * 2.0, newWidth));
+    newHeight = Math.max(baseHeight * 0.5, Math.min(baseHeight * 2.0, newHeight));
+
+    // Guard against Transformer accidentally scaling the node, we manage size via width/height
     node.scaleX(1);
     node.scaleY(1);
 
-    if (!movingItem) return;
-
     const collides = hasCollision(
-      id, movingItem.x, movingItem.y, movingItem.width, movingItem.height,
+      id, movingItem.x, movingItem.y, newWidth, newHeight,
       placedFurniture, newRotation
     );
 
     if (collides) {
-      // Revert to original rotation if collision happens
+      // Revert to original properties if collision happens
       node.rotation(movingItem.rotation ?? 0);
+      node.width(movingItem.width);
+      node.height(movingItem.height);
       node.getLayer()?.batchDraw();
       return;
     }
 
     pushHistory({ rooms, currentPoints, placedFurniture });
     setPlacedFurniture(prev =>
-      prev.map(f => f.id === id ? { ...f, rotation: newRotation } : f)
+      prev.map(f => f.id === id ? { ...f, rotation: newRotation, width: newWidth, height: newHeight } : f)
     );
   };
 
@@ -586,28 +615,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       const ax2 = p2.x + offX;
       const ay2 = p2.y + offY;
 
-      // ── Wall stroke ──────────────────────────────────────────────────────
-      walls.push(
-        <Line
-          key={`${keyPrefix}-w-${i}`}
-          points={[p1.x, p1.y, p2.x, p2.y]}
-          stroke={WALL_COLOR}
-          strokeWidth={6}
-          lineCap="square"
-          lineJoin="miter"
-          perfectDrawEnabled={false} shadowForStrokeEnabled={false}
-        />
-      );
-      walls.push(
-        <Line
-          key={`${keyPrefix}-wi-${i}`}
-          points={[p1.x, p1.y, p2.x, p2.y]}
-          stroke="#6B7280"
-          strokeWidth={2}
-          lineCap="round"
-          perfectDrawEnabled={false} shadowForStrokeEnabled={false}
-        />
-      );
+      // We no longer draw individual wall segments here to ensure continuous sharp corners.
+      // Instead, we will draw one continuous line after the loop.
 
       // ── Thin dashed extension lines (wall endpoint → arrow endpoint) ────
       labels.push(
@@ -673,16 +682,31 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         />
       );
       labels.push(
-        <Text key={`${keyPrefix}-txt-${i}`}
+        <Text
+          key={`${keyPrefix}-lbl-${i}`}
           x={textX} y={textY}
-          text={label}
-          fontSize={10} fontStyle="normal"
-          fill="#64748b"
-          fontFamily="Inter, system-ui, sans-serif"
           width={textW} align="center"
+          text={label}
+          fontSize={12} fill={TEXT_COLOR}
+          fontFamily="Inter, sans-serif" fontWeight={500}
         />
       );
     }
+
+    // Draw the continuous sharp wall perimeter
+    walls.push(
+      <Line
+        key={`${keyPrefix}-perimeter`}
+        points={points.flatMap(p => [p.x, p.y])}
+        closed
+        stroke="#1e293b" // Dark, matte color
+        strokeWidth={10}  // Solid thick walls
+        lineJoin="miter" // Perfect sharp corners
+        perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+        listening={false} // Ensure this doesn't intercept interior floor clicks
+      />
+    );
+
     return { walls, labels };
   };
 
@@ -754,6 +778,10 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
 
   const staticRoomShapes = useMemo(() => {
     return rooms.map((room, ri) => {
+      const isSelected = ri === selectedRoomIndex;
+      const textureId = room.floorTextureId || 'wood-oak';
+      const patternImage = loadedTextures[textureId] || undefined;
+
       const floorPoints = room.points.flatMap(p => [p.x, p.y]);
       const { walls, labels } = buildWallsAndLabels(room.points, `room${ri}`);
       const centerX = room.points.reduce((s, p) => s + p.x, 0) / room.points.length;
@@ -764,20 +792,40 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             key={`floor-${ri}`}
             points={floorPoints}
             closed
-            fillPatternImage={woodPattern}
+            fillPatternImage={patternImage}
             fillPatternRepeat="repeat"
             fillPatternScale={{ x: 0.2, y: 0.2 }}
-            fillPriority={woodPattern ? 'pattern' : 'color'}
+            fillPriority={patternImage ? 'pattern' : 'color'}
             fill="#d2a96e"
-            stroke="#334155"
-            strokeWidth={1}
             shadowColor="#000"
             shadowBlur={12}
             shadowOpacity={0.12}
             perfectDrawEnabled={false}
             shadowForStrokeEnabled={false}
+            onClick={(e) => { 
+              if (pendingFurniture) return; 
+              e.cancelBubble = true; 
+              if (setSelectedRoomIndex) setSelectedRoomIndex(ri); 
+            }}
+            onTap={(e) => { 
+              if (pendingFurniture) return; 
+              e.cancelBubble = true; 
+              if (setSelectedRoomIndex) setSelectedRoomIndex(ri); 
+            }}
           />
           {walls}
+          {isSelected && (
+            <Line
+              key={`selected-highlight-${ri}`}
+              points={floorPoints}
+              closed
+              stroke="#22c55e"
+              strokeWidth={2}
+              dash={[6, 6]}
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+          )}
           {labels}
           <Text
             key={`rl-${ri}`}
@@ -793,7 +841,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         </React.Fragment>
       );
     });
-  }, [rooms, woodPattern]);
+  }, [rooms, loadedTextures, selectedRoomIndex, setSelectedRoomIndex]);
 
   // Handlers wrapped in useCallback to preserve furniture memoization
   const handleFurnitureDragMoveCb = useCallback((id, e) => handleFurnitureDragMove(id, e), [placedFurniture, rooms, currentPoints]);
@@ -852,7 +900,56 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       </div>
 
       {/* ══════════ CANVAS AREA ══════════ */}
-      <div className="canvas-stage-wrapper">
+      <div 
+        className="canvas-stage-wrapper"
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={(e) => {
+          e.preventDefault();
+          try {
+            const data = e.dataTransfer.getData('application/json');
+            if (!data) return;
+            const item = JSON.parse(data);
+            
+            const stage = stageRef.current;
+            if (!stage) return;
+            
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pointerX = e.clientX - rect.left;
+            const pointerY = e.clientY - rect.top;
+            
+            const scale = stage.scaleX();
+            const worldX = (pointerX - stage.x()) / scale;
+            const worldY = (pointerY - stage.y()) / scale;
+            
+            const width = item.width * PIXELS_PER_FOOT;
+            const height = item.height * PIXELS_PER_FOOT;
+            const { x: snappedX, y: snappedY } = applySnap(worldX, worldY, width, height);
+
+            if (hasCollision(null, snappedX, snappedY, width, height, placedFurniture)) {
+              alert('Cannot place furniture here - it overlaps another item.');
+              return;
+            }
+            
+            const newItem = {
+              id: `${item.id}-${Date.now()}`,
+              catalogId: item.id,
+              name: item.name,
+              x: snappedX,
+              y: snappedY,
+              width,
+              height,
+              color: item.color,
+              price: item.price,
+              rotation: 0
+            };
+            pushHistory({ rooms, currentPoints, placedFurniture });
+            setPlacedFurniture(prev => [...prev, newItem]);
+            if (onFurniturePlaced) onFurniturePlaced();
+          } catch (err) {
+            console.error('Drop error:', err);
+          }
+        }}
+      >
 
         {/* Placement hint toast */}
         {pendingFurniture && (
@@ -935,7 +1032,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
 
             <Transformer
               ref={transformerRef}
-              enabledAnchors={[]} rotateEnabled={true}
+              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']} rotateEnabled={true}
               borderStroke="#6b5b95" borderStrokeWidth={1.5} borderDash={[4,4]}
               anchorStroke="#6b5b95" anchorFill="#fff"
               anchorSize={8} anchorCornerRadius={4} rotateAnchorOffset={20}
