@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
 import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow, Shape, Arc } from 'react-konva';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 import { FLOOR_TEXTURES } from '../../data/floorTextures';
+import html2canvas from 'html2canvas';
 
 const GRID_SIZE = 20;
 const PIXELS_PER_FOOT = 20;
@@ -128,7 +129,7 @@ const GridShape = () => (
   />
 );
 
-function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick, doors = [], setDoors, doorPlacementMode, setDoorPlacementMode, pendingDoorType, pendingDoorWidth, readOnly = false }) {
+function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick, doors = [], setDoors, doorPlacementMode, setDoorPlacementMode, pendingDoorType, pendingDoorWidth, readOnly = false }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
   const containerRef = useRef(null);
   const stageRef = useRef(null);           // ref to Konva Stage for zoom controls
@@ -147,6 +148,79 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const [selectedId, setSelectedId] = useState(null);
   const [selectedDoorId, setSelectedDoorId] = useState(null);
   const [hoveredWall, setHoveredWall] = useState(null); // { roomIndex, wallIndex, point }
+
+  // Expose capture functionality to parent via exportRef
+  useImperativeHandle(exportRef, () => ({
+    async captureFullView() {
+      const stage = stageRef.current;
+      if (!stage) return null;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      
+      rooms.forEach(room => {
+        room.points.forEach(p => {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+        });
+      });
+      
+      placedFurniture.forEach(f => {
+        if (f.x < minX) minX = f.x;
+        if (f.x + f.width > maxX) maxX = f.x + f.width;
+        if (f.y < minY) minY = f.y;
+        if (f.y + f.height > maxY) maxY = f.y + f.height;
+      });
+      
+      if (minX === Infinity) {
+        minX = 0; minY = 0; maxX = stageSize.width; maxY = stageSize.height;
+      }
+      
+      const padding = 120; // Increased padding to ensure dimension lines outside rooms are fully captured
+      minX -= padding;
+      minY -= padding;
+      maxX += padding;
+      maxY += padding;
+      
+      const width = maxX - minX;
+      const height = maxY - minY;
+      
+      const scaleX = stageSize.width / width;
+      const scaleY = stageSize.height / height;
+      const scale = Math.min(scaleX, scaleY);
+      
+      const oldScale = stage.scale();
+      const oldPos = stage.position();
+      const oldSelection = selectedRoomIndex;
+      
+      // Clear selection so borders don't appear in export
+      setSelectedRoomIndex(null);
+      
+      stage.scale({ x: scale, y: scale });
+      stage.position({
+        x: -minX * scale + (stageSize.width - width * scale) / 2,
+        y: -minY * scale + (stageSize.height - height * scale) / 2
+      });
+      
+      stage.batchDraw();
+      await new Promise(r => setTimeout(r, 100)); // wait for render
+      
+      const stageElement = document.querySelector('.canvas-stage');
+      const canvas = await html2canvas(stageElement, {
+        useCORS: true,
+        scale: 2,
+        backgroundColor: '#f8fafc',
+      });
+      
+      stage.scale(oldScale);
+      stage.position(oldPos);
+      setSelectedRoomIndex(oldSelection);
+      stage.batchDraw();
+      
+      return canvas.toDataURL('image/png');
+    }
+  }));
 
   const [loadedTextures, setLoadedTextures] = useState({});
   useEffect(() => {

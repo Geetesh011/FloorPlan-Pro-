@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 
-function FurnitureCatalogContent({ onSelectFurniture }) {
+function FurnitureCatalogContent({ onSelectFurniture, onClose }) {
   const [activeId, setActiveId] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All'); // Keeping activeCategory state for future expansion if needed
@@ -21,11 +21,14 @@ function FurnitureCatalogContent({ onSelectFurniture }) {
 
   return (
     <div className="catalog-panel">
-      <div className="catalog-header">
+      <div className="catalog-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div className="catalog-title" style={{ fontSize: '1.25rem', fontWeight: '700', letterSpacing: '-0.01em', margin: 0 }}>Furniture</div>
           <div className="catalog-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Tap an item to place it in your room</div>
         </div>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <div className="catalog-search">

@@ -82,7 +82,8 @@ function DoorCatalogContent({
   setPendingDoorType,
   pendingDoorWidth,
   setPendingDoorWidth,
-  rooms
+  rooms,
+  onClose
 }) {
 
   const handleTypeSelect = (typeId) => {
@@ -96,8 +97,14 @@ function DoorCatalogContent({
 
   return (
     <div className="catalog-panel">
-      <div style={{ marginBottom: '16px' }}>
-        <div className="catalog-title" style={{ color: '#f8fafc' }}>Doors</div>
+      <div className="catalog-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <div>
+          <div className="catalog-title" style={{ fontSize: '1.25rem', fontWeight: '700', letterSpacing: '-0.01em', margin: 0, color: '#f8fafc' }}>Doors & Windows</div>
+          <div className="catalog-subtitle" style={{ fontWeight: '400', color: '#64748b', fontSize: '0.875rem', marginTop: '0.25rem' }}>Select a type to place on a wall</div>
+        </div>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <div className="door-section-title">Door Type</div>

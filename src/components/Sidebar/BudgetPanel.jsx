@@ -41,7 +41,7 @@ function ItemRow({ item, onPriceChange, onRemove, readOnly }) {
       </div>
       <div className="budget-item-meta">
         <div className="budget-item-title" style={{ fontWeight: '500', fontSize: '1rem' }}>{item.name}</div>
-        <div className="budget-item-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)' }}>{category}</div>
+        <div className="budget-item-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted)' }}>{category}</div>
       </div>
       <div className="budget-item-controls">
         {editing && !readOnly ? (
@@ -100,7 +100,7 @@ function DoorItemRow({ door, onRemove, readOnly }) {
       </div>
       <div className="budget-item-meta">
         <div className="budget-item-title" style={{ fontWeight: '500', fontSize: '1rem' }}>{name}</div>
-        <div className="budget-item-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)' }}>Doors</div>
+        <div className="budget-item-subtitle" style={{ fontWeight: '400', color: 'var(--text-muted)' }}>Doors</div>
       </div>
       <div className="budget-item-controls">
         <div className="budget-price-button" style={{ cursor: 'default', background: 'none' }}>
@@ -185,7 +185,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove, doors = 
       <div className="budget-headline">
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>Budget Estimate</h2>
-          <span style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem' }}>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+          <span style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.875rem' }}>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
         </div>
         <button
           type="button"
@@ -201,14 +201,14 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove, doors = 
         <section className="budget-section">
           <div className="budget-total-card">
             <div>
-              <div className="budget-total-label" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Total Estimate</div>
+              <div className="budget-total-label" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>Total Estimate</div>
               <div className="budget-total-value" style={{ fontWeight: '700', fontSize: '2rem', letterSpacing: '-0.02em' }}>{fmt(total)}</div>
               {itemCount === 0 ? (
-                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                   Add furniture to start seeing your estimate.
                 </div>
               ) : (
-                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                <div className="budget-summary-hint" style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                   {itemCount} item{itemCount !== 1 ? 's' : ''} placed in room.
                 </div>
               )}
@@ -219,7 +219,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove, doors = 
 
         {Object.keys(byCategory).length > 0 && (
           <section className="budget-section">
-            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Category Breakdown</div>
+            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Category Breakdown</div>
             <div className="budget-legend">
               {Object.entries(byCategory).map(([cat, amount]) => {
                 const legendClass = `category-${cat.toLowerCase().replace(/\s+/g, '-')}`;
@@ -237,7 +237,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove, doors = 
 
         { (placedFurniture.length > 0 || (doors || []).length > 0) ? (
           <section className="budget-section">
-            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Items in room</div>
+            <div className="budget-section-heading" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '500', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Items in room</div>
             {placedFurniture.map((item) => (
               <ItemRow key={item.id} item={item} onPriceChange={onPriceChange} onRemove={onRemove} readOnly={readOnly} />
             ))}
@@ -249,7 +249,7 @@ function BudgetPanel({ rooms, placedFurniture, onPriceChange, onRemove, doors = 
           <div className="budget-empty-state">
             <div className="budget-empty-icon">🛋️</div>
             <div className="budget-empty-title" style={{ fontWeight: '500', fontSize: '1rem', marginTop: '1rem' }}>No furniture in the room yet</div>
-            <div className="budget-empty-copy" style={{ fontWeight: '400', color: 'var(--text-muted, #64748b)', fontSize: '0.875rem', marginTop: '0.5rem', textAlign: 'center' }}>
+            <div className="budget-empty-copy" style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem', textAlign: 'center' }}>
               Drag a furniture item from the left panel onto the canvas to preview cost and budget breakdown.
             </div>
           </div>

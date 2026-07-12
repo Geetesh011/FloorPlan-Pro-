@@ -7,6 +7,7 @@ import {
   getOrCreateUserId, saveDesign, listDesigns,
   loadDesign, deleteDesign, createSharedProject
 } from '../utils/saveLoad';
+import { exportAsImage, exportAsPDF } from '../utils/exportUtils';
 
 const userId = getOrCreateUserId();
 
@@ -46,6 +47,8 @@ export default function EditorView() {
   const [toast,       setToast]       = useState(null);
   const [shareOpen,   setShareOpen]   = useState(false);
   const [shareUrl,    setShareUrl]    = useState('');
+  
+  const canvasRef = useRef(null);
 
   // ── Toast ─────────────────────────────────────────────────────────────
   const showToast = useCallback((msg, ok = true) => {
@@ -72,15 +75,19 @@ export default function EditorView() {
   };
 
   // ── Share (generate link) ───────────────────────────────────────────────
-  const handleShareProject = async () => {
-    console.log('[handleShareProject] Triggered!');
-    setSaving(true);
+  const handleShareProject = () => {
     setShareOpen(false);
+    setShareUrl('');
+    setModal('share');
+  };
+
+  const generateShareLink = async () => {
+    console.log('[generateShareLink] Triggered!');
+    setSaving(true);
     try {
-      console.log('[handleShareProject] About to call createSharedProject (Firestore write)...');
+      console.log('[generateShareLink] About to call createSharedProject (Firestore write)...');
       const docId = await createSharedProject(rooms, placedFurniture, doors);
       setShareUrl(window.location.origin + '/view/' + docId);
-      setModal('share');
       showToast('✅ Share link generated!');
     } catch (e) { showToast('❌ Share failed: ' + e.message, false); }
     finally { setSaving(false); }
@@ -157,26 +164,42 @@ export default function EditorView() {
             className="top-pill" 
             onClick={quickSave}
             title="Save Project"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#6366f1', border: '1px solid #e2e8f0', padding: '8px 12px' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)', color: 'var(--accent-purple)', border: '1px solid var(--border-input)', padding: '8px 12px' }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
           </button>
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', zIndex: 1000 }}>
             <button 
               type="button" 
               className="top-pill" 
               onClick={() => setShareOpen(!shareOpen)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', color: '#22c55e', border: '1px solid #e2e8f0', padding: '8px 12px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-hover)', color: 'var(--accent-green)', border: '1px solid var(--border-input)', padding: '8px 12px' }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
             </button>
             {shareOpen && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '8px', width: '240px', zIndex: 100, fontFamily: 'Inter, system-ui, sans-serif' }}>
-                <div style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontWeight: 500 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                  Print
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: 'var(--bg-panel)', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '8px', width: '240px', zIndex: 100, fontFamily: 'Inter, system-ui, sans-serif' }}>
+                <div onClick={async () => { 
+                  setShareOpen(false); 
+                  if (!canvasRef.current) return;
+                  const dataUrl = await canvasRef.current.captureFullView();
+                  const name = rooms.length > 0 ? (rooms.length === 1 ? 'Room 1' : `${rooms.length} Rooms Design`) : 'Empty Design';
+                  exportAsImage(saveName || name, dataUrl); 
+                }} className="dropdown-menu-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                  Export as Image
                 </div>
-                <div onClick={handleShareProject} style={{ padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontWeight: 500 }}>
+                <div onClick={async () => { 
+                  setShareOpen(false); 
+                  if (!canvasRef.current) return;
+                  const dataUrl = await canvasRef.current.captureFullView();
+                  const name = rooms.length > 0 ? (rooms.length === 1 ? 'Room 1' : `${rooms.length} Rooms Design`) : 'Empty Design';
+                  exportAsPDF(saveName || name, placedFurniture, doors, dataUrl); 
+                }} className="dropdown-menu-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  Export as PDF
+                </div>
+                <div onClick={handleShareProject} className="dropdown-menu-item">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                   Share Project
                 </div>
@@ -207,6 +230,7 @@ export default function EditorView() {
 
         <div className="app-canvas-area">
           <Canvas
+            exportRef={canvasRef}
             pendingFurniture={pendingFurniture}
             onFurniturePlaced={() => setPendingFurniture(null)}
             placedFurniture={placedFurniture}
@@ -276,32 +300,43 @@ export default function EditorView() {
       {/* ════ SHARE MODAL ════ */}
       {modal === 'share' && (
         <div className="modal-backdrop" onClick={closeModal}>
-          <div className="app-modal-card">
-            <div className="app-modal-header save">
-              <div>
-                <h2>Project Shared!</h2>
-                <p>Anyone with this link can view a read-only version of your project.</p>
-              </div>
-              <button className="app-modal-close" onClick={() => setModal(null)}>✕</button>
+          <div className="app-modal-card" style={{ width: '380px' }} onClick={e => e.stopPropagation()}>
+            <div className="app-modal-header" style={{ color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 0 }}>
+              <h2 className="app-modal-title" style={{ fontSize: '1.25rem', fontWeight: 600 }}>Floor Plan Pro</h2>
+              <button className="app-modal-close-button" style={{ color: 'var(--text-muted)', background: 'transparent', fontSize: '20px' }} onClick={closeModal}>×</button>
             </div>
-            <div className="app-modal-body">
-              <input
-                type="text"
-                className="app-modal-input"
-                value={shareUrl}
-                readOnly
-                onClick={(e) => e.target.select()}
-                style={{ backgroundColor: '#f1f5f9', color: '#475569' }}
-              />
-            </div>
-            <div className="app-modal-footer">
-              <button className="app-modal-btn default" onClick={() => setModal(null)}>Close</button>
-              <button className="app-modal-btn primary" onClick={() => {
-                navigator.clipboard.writeText(shareUrl);
-                showToast('✅ Link copied to clipboard!');
-              }}>
-                Copy Link
-              </button>
+            <div className="app-modal-content">
+              <p className="app-modal-subtitle" style={{ marginBottom: '16px' }}>
+                Generate a link to share a read-only version of your project.
+              </p>
+              
+              {shareUrl ? (
+                <>
+                  <div className="app-modal-row">
+                    <input
+                      type="text"
+                      className="app-modal-input"
+                      value={shareUrl}
+                      readOnly
+                      onClick={(e) => e.target.select()}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+                    <button className="app-modal-button secondary" onClick={closeModal}>Close</button>
+                    <button className="app-modal-button primary" onClick={() => {
+                      navigator.clipboard.writeText(shareUrl);
+                      showToast('📋 Link copied to clipboard!');
+                    }}>Copy Link</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+                  <button className="app-modal-button secondary" onClick={closeModal}>Cancel</button>
+                  <button className="app-modal-button primary" onClick={generateShareLink} disabled={saving}>
+                    {saving ? 'Generating...' : 'Generate Link'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
