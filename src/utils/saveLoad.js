@@ -13,7 +13,7 @@
 import { db } from '../firebase';
 import {
   collection, doc,
-  setDoc, getDoc, getDocs, deleteDoc,
+  setDoc, getDoc, getDocs, deleteDoc, addDoc,
   serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 
@@ -29,7 +29,7 @@ export function getOrCreateUserId() {
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────
-export async function saveDesign(userId, name, rooms, placedFurniture) {
+export async function saveDesign(userId, name, rooms, placedFurniture, doors = []) {
   const designId = crypto.randomUUID();
   await setDoc(
     doc(db, 'floorplans', userId, 'designs', designId),
@@ -38,6 +38,7 @@ export async function saveDesign(userId, name, rooms, placedFurniture) {
       savedAt:         serverTimestamp(),
       rooms,
       placedFurniture,
+      doors,
     }
   );
   return designId;
@@ -63,11 +64,28 @@ export async function listDesigns(userId) {
 export async function loadDesign(userId, designId) {
   const snap = await getDoc(doc(db, 'floorplans', userId, 'designs', designId));
   if (!snap.exists()) throw new Error('Design not found');
-  const { rooms, placedFurniture } = snap.data();
-  return { rooms: rooms ?? [], placedFurniture: placedFurniture ?? [] };
+  const { rooms, placedFurniture, doors } = snap.data();
+  return { rooms: rooms ?? [], placedFurniture: placedFurniture ?? [], doors: doors ?? [] };
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────
 export async function deleteDesign(userId, designId) {
   await deleteDoc(doc(db, 'floorplans', userId, 'designs', designId));
+}
+
+// ── Shared Projects ───────────────────────────────────────────────────────
+export async function createSharedProject(rooms, placedFurniture, doors) {
+  const docRef = await addDoc(collection(db, 'sharedProjects'), {
+    createdAt: serverTimestamp(),
+    rooms,
+    placedFurniture,
+    doors,
+  });
+  return docRef.id;
+}
+
+export async function getSharedProject(projectId) {
+  const snap = await getDoc(doc(db, 'sharedProjects', projectId));
+  if (!snap.exists()) return null;
+  return snap.data();
 }

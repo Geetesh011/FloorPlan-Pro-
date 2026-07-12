@@ -1,9 +1,9 @@
 import woodFloor from '../assets/textures/wood_floor.png';
 import marble from '../assets/textures/Marble.png';
 import modernTile from '../assets/textures/Modern tile.png';
-import classicWood from '../assets/textures/Wood.png';
+import beautifulWood from '../assets/textures/beautiful-wood-texture-background.png';
 import bathroomTile from '../assets/textures/bathroom.png';
-import detailedMarble from '../assets/textures/closeup-marble-textured-background.png';
+import whiteWood from '../assets/textures/white-wood-textures.png';
 import grayTiles from '../assets/textures/gray-tiles-textures-surface.png';
 import parquetWood from '../assets/textures/wooden-parquet-floor.png';
 
@@ -14,9 +14,9 @@ export const FLOOR_TEXTURES = [
     thumbnail: woodFloor,
   },
   {
-    id: 'classic-wood',
-    name: 'Classic Wood',
-    thumbnail: classicWood,
+    id: 'beautiful-wood',
+    name: 'Beautiful Wood',
+    thumbnail: beautifulWood,
   },
   {
     id: 'parquet-wood',
@@ -24,14 +24,14 @@ export const FLOOR_TEXTURES = [
     thumbnail: parquetWood,
   },
   {
+    id: 'white-wood',
+    name: 'White Wood',
+    thumbnail: whiteWood,
+  },
+  {
     id: 'marble',
     name: 'Marble',
     thumbnail: marble,
-  },
-  {
-    id: 'detailed-marble',
-    name: 'Detailed Marble',
-    thumbnail: detailedMarble,
   },
   {
     id: 'modern-tile',

@@ -873,6 +873,7 @@ body {
 
 .catalog-item-name {
   color: #1f2937;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 13px;
   font-weight: 700;
   margin-top: 4px;
@@ -1587,4 +1588,171 @@ body {
 
 .toggle-switch.active::after {
   transform: translateX(20px);
+}
+
+/* ══════ Door Placement Styles ══════ */
+
+.door-place-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.07);
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 14px;
+}
+
+.door-place-btn:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+
+.door-place-btn.active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.3);
+}
+
+.catalog-rail-button.door-active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+}
+
+.door-hint-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-top: 4px;
+}
+
+.door-hint-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.door-hint-text {
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 500;
+}
+
+.canvas-toast.door-mode {
+  background: linear-gradient(135deg, #8B5E3C, #6B4226);
+  box-shadow: 0 8px 24px rgba(139,94,60,0.35);
+}
+
+.door-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.door-width-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.door-width-btn {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 45px;
+}
+
+.door-width-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.door-width-btn.active {
+  background: rgba(34,197,94,0.15);
+  border-color: rgba(34,197,94,0.4);
+  color: #22c55e;
+}
+
+.placed-doors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.placed-door-card {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.placed-door-thumb-small {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.placed-door-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.placed-door-name {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.placed-door-room {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.placed-door-remove {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.placed-door-remove:hover {
+  background: #fee2e2;
+  color: #ef4444;
 }

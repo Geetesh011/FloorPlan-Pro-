@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { snapToGrid, snapToWall } from '../../utils/snapping';
-import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow, Shape } from 'react-konva';
+import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Transformer, Arrow, Shape, Arc } from 'react-konva';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 import { FLOOR_TEXTURES } from '../../data/floorTextures';
 
@@ -128,7 +128,7 @@ const GridShape = () => (
   />
 );
 
-function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick }) {
+function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick, doors = [], setDoors, doorPlacementMode, setDoorPlacementMode, pendingDoorType, pendingDoorWidth, readOnly = false }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
   const containerRef = useRef(null);
   const stageRef = useRef(null);           // ref to Konva Stage for zoom controls
@@ -145,6 +145,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const [pendingRoom, setPendingRoom] = useState(null);
   const [roomNameInput, setRoomNameInput] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedDoorId, setSelectedDoorId] = useState(null);
+  const [hoveredWall, setHoveredWall] = useState(null); // { roomIndex, wallIndex, point }
 
   const [loadedTextures, setLoadedTextures] = useState({});
   useEffect(() => {
@@ -300,6 +302,34 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   };
   // ─────────────────────────────────────────────────────────────────────────
 
+  // ── Door placement: project a point onto a wall segment ──────────────────
+  const projectPointOnSegment = (px, py, ax, ay, bx, by) => {
+    const dx = bx - ax, dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1) return { t: 0, dist: Math.hypot(px - ax, py - ay), x: ax, y: ay };
+    let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = ax + t * dx, projY = ay + t * dy;
+    const dist = Math.hypot(px - projX, py - projY);
+    return { t, dist, x: projX, y: projY };
+  };
+
+  // ── Find nearest wall to a world point (for door placement hover) ────────
+  const findNearestWall = (worldX, worldY, maxDist = 20) => {
+    let best = null;
+    rooms.forEach((room, ri) => {
+      for (let wi = 0; wi < room.points.length; wi++) {
+        const p1 = room.points[wi];
+        const p2 = room.points[(wi + 1) % room.points.length];
+        const proj = projectPointOnSegment(worldX, worldY, p1.x, p1.y, p2.x, p2.y);
+        if (proj.dist < maxDist && (!best || proj.dist < best.dist)) {
+          best = { roomIndex: ri, wallIndex: wi, t: proj.t, dist: proj.dist, x: proj.x, y: proj.y };
+        }
+      }
+    });
+    return best;
+  };
+
   const handleStageClick = (e) => {
     // Ignore clicks that were actually a pan drag
     if (e.target.getStage().isDragging()) return;
@@ -307,7 +337,51 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     // If clicking on empty stage (e.target === Stage), clear selections
     if (e.target === e.target.getStage()) {
       setSelectedId(null);
+      setSelectedDoorId(null);
       if (setSelectedRoomIndex) setSelectedRoomIndex(null);
+    }
+
+    // ── Door placement mode ─────────────────────────────────────────────
+    if (doorPlacementMode && !pendingFurniture) {
+      if (!pendingDoorType) {
+        // User clicked but hasn't selected a door type yet
+        alert('Please select a Door Type from the catalog first.');
+        return;
+      }
+      const pos = e.target.getStage().getRelativePointerPosition();
+      if (!pos) return;
+      const nearest = findNearestWall(pos.x, pos.y, 25);
+      if (!nearest) return; // no wall nearby
+
+      const room = rooms[nearest.roomIndex];
+      const p1 = room.points[nearest.wallIndex];
+      const p2 = room.points[(nearest.wallIndex + 1) % room.points.length];
+      const wallLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const doorWidthFt = pendingDoorWidth || 3;
+      const doorWidthPx = doorWidthFt * PIXELS_PER_FOOT;
+      const halfT = doorWidthPx / (2 * wallLen);
+
+      // Clamp so the door doesn't hang off the wall ends
+      let posAlongWall = nearest.t;
+      posAlongWall = Math.max(halfT, Math.min(1 - halfT, posAlongWall));
+
+      // Check this wall has room for the door (wall must be longer than door)
+      if (wallLen < doorWidthPx) return;
+
+      const newDoor = {
+        id: `door-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        roomIndex: nearest.roomIndex,
+        wallIndex: nearest.wallIndex,
+        positionAlongWall: posAlongWall,
+        width: doorWidthFt,
+        type: pendingDoorType,
+      };
+
+      pushHistory({ rooms, currentPoints, placedFurniture });
+      setDoors(prev => [...prev, newDoor]);
+      setDoorPlacementMode(false); // exit after placing one
+      setHoveredWall(null);
+      return;
     }
 
     if (pendingFurniture) {
@@ -341,6 +415,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     }
 
     if (pendingRoom) return;
+    if (doorPlacementMode) return; // block room drawing while in door mode
     if (e.evt.detail > 1) return; // ignore the second click of a double-click
 
     // getRelativePointerPosition → world coords (corrected for pan + zoom)
@@ -377,6 +452,14 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     const snappedY = Math.round(pos.y / GRID_SIZE) * GRID_SIZE;
     setMousePos({ x: snappedX, y: snappedY });
 
+    // ── Door placement: track hovered wall ──────────────────────────────
+    if (doorPlacementMode) {
+      const nearest = findNearestWall(pos.x, pos.y, 25);
+      setHoveredWall(nearest); // null if nothing nearby
+    } else if (hoveredWall) {
+      setHoveredWall(null);
+    }
+
     if (currentPoints.length >= 3) {
       const first = currentPoints[0];
       const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
@@ -400,6 +483,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   // Double-click is kept as an alternative way to close the room
   const handleDoubleClick = () => {
     if (pendingFurniture) return;
+    if (doorPlacementMode) return; // block room closing in door mode
     if (currentPoints.length >= 3) finishRoom();
   };
 
@@ -529,6 +613,12 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   };
 
   const handleDeleteSelected = () => {
+    if (selectedDoorId) {
+      pushHistory({ rooms, currentPoints, placedFurniture });
+      setDoors(prev => prev.filter(d => d.id !== selectedDoorId));
+      setSelectedDoorId(null);
+      return;
+    }
     if (!selectedId) return;
     pushHistory({ rooms, currentPoints, placedFurniture });
     setPlacedFurniture(placedFurniture.filter(f => f.id !== selectedId));
@@ -542,11 +632,14 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         undo();
+      } else if (e.key === 'Escape' && doorPlacementMode) {
+        setDoorPlacementMode(false);
+        setHoveredWall(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, placedFurniture, rooms, currentPoints]);
+  }, [selectedId, selectedDoorId, placedFurniture, rooms, currentPoints, doors, doorPlacementMode]);
 
   // Attach / detach the Transformer whenever the selected furniture item changes.
   useEffect(() => {
@@ -569,7 +662,12 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     confirmRoomName();
   };
 
-  const buildWallsAndLabels = (points, keyPrefix) => {
+  // ── Collect door gaps for a specific wall of a specific room ───────────
+  const getDoorsOnWall = (roomIndex, wallIndex) => {
+    return doors.filter(d => d.roomIndex === roomIndex && d.wallIndex === wallIndex);
+  };
+
+  const buildWallsAndLabels = (points, keyPrefix, roomIndex) => {
     const walls = [];
     const labels = [];
     if (points.length < 2) return { walls, labels };
@@ -583,7 +681,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
     const ARROW_PX    = 5;     // arrowhead pointer size
     const LINE_COLOR  = '#64748b';
     const TEXT_COLOR  = '#1e293b';
-    const WALL_COLOR  = '#334155';
+    const WALL_COLOR  = '#1e293b';
+    const WALL_WIDTH  = 10;
 
     for (let i = 0; i < points.length; i++) {
       const p1 = points[i];
@@ -615,8 +714,65 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       const ax2 = p2.x + offX;
       const ay2 = p2.y + offY;
 
-      // We no longer draw individual wall segments here to ensure continuous sharp corners.
-      // Instead, we will draw one continuous line after the loop.
+      // ── Per-segment wall Lines with door gap splitting ─────────────────
+      const wallDoors = (roomIndex !== undefined) ? getDoorsOnWall(roomIndex, i) : [];
+
+      if (wallDoors.length === 0) {
+        // No doors on this wall — draw solid wall segment
+        walls.push(
+          <Line key={`${keyPrefix}-w-${i}`}
+            points={[p1.x, p1.y, p2.x, p2.y]}
+            stroke={WALL_COLOR} strokeWidth={WALL_WIDTH}
+            lineCap="square" lineJoin="miter"
+            perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+            listening={false}
+          />
+        );
+      } else {
+        // Sort doors by position along wall
+        const sorted = [...wallDoors].sort((a, b) => a.positionAlongWall - b.positionAlongWall);
+
+        // Build gap intervals as t-ranges [gapStart, gapEnd]
+        const gaps = sorted.map(d => {
+          const doorPx = d.width * PIXELS_PER_FOOT;
+          const halfT = doorPx / (2 * len);
+          const gapStart = Math.max(0, d.positionAlongWall - halfT);
+          const gapEnd   = Math.min(1, d.positionAlongWall + halfT);
+          return { gapStart, gapEnd };
+        });
+
+        // Draw wall sub-segments between gaps
+        let cursor = 0;
+        gaps.forEach((gap, gi) => {
+          if (cursor < gap.gapStart) {
+            const sx = p1.x + cursor * dx, sy = p1.y + cursor * dy;
+            const ex = p1.x + gap.gapStart * dx, ey = p1.y + gap.gapStart * dy;
+            walls.push(
+              <Line key={`${keyPrefix}-w-${i}-seg-${gi}a`}
+                points={[sx, sy, ex, ey]}
+                stroke={WALL_COLOR} strokeWidth={WALL_WIDTH}
+                lineCap="square" lineJoin="miter"
+                perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+                listening={false}
+              />
+            );
+          }
+          cursor = gap.gapEnd;
+        });
+        // Draw trailing segment after last gap
+        if (cursor < 1) {
+          const sx = p1.x + cursor * dx, sy = p1.y + cursor * dy;
+          walls.push(
+            <Line key={`${keyPrefix}-w-${i}-seg-tail`}
+              points={[sx, sy, p2.x, p2.y]}
+              stroke={WALL_COLOR} strokeWidth={WALL_WIDTH}
+              lineCap="square" lineJoin="miter"
+              perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+              listening={false}
+            />
+          );
+        }
+      }
 
       // ── Thin dashed extension lines (wall endpoint → arrow endpoint) ────
       labels.push(
@@ -693,21 +849,196 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
       );
     }
 
-    // Draw the continuous sharp wall perimeter
-    walls.push(
-      <Line
-        key={`${keyPrefix}-perimeter`}
-        points={points.flatMap(p => [p.x, p.y])}
-        closed
-        stroke="#1e293b" // Dark, matte color
-        strokeWidth={10}  // Solid thick walls
-        lineJoin="miter" // Perfect sharp corners
-        perfectDrawEnabled={false} shadowForStrokeEnabled={false}
-        listening={false} // Ensure this doesn't intercept interior floor clicks
-      />
-    );
-
     return { walls, labels };
+  };
+
+  // ── Build door shapes (panel line + swing arc) ──────────────────────────
+  const buildDoorShapes = (roomIndex, points) => {
+    const shapes = [];
+    const roomDoors = doors.filter(d => d.roomIndex === roomIndex);
+    if (roomDoors.length === 0) return shapes;
+
+    // Room centroid — used to determine "inward" direction for swing
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+
+    const DOOR_COLOR = '#8B5E3C';     // warm brown for door panel
+    const ARC_COLOR  = '#8B5E3C';     // same brown for arc
+    const SELECTED_COLOR = '#22c55e'; // green highlight when selected
+
+    roomDoors.forEach((door) => {
+      const wi = door.wallIndex;
+      if (wi >= points.length) return;
+      const p1 = points[wi];
+      const p2 = points[(wi + 1) % points.length];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const wallLen = Math.hypot(dx, dy);
+      if (wallLen < 2) return;
+
+      const ux = dx / wallLen, uy = dy / wallLen;
+      const doorPx = door.width * PIXELS_PER_FOOT;
+      const halfT = doorPx / (2 * wallLen);
+      const gapStartT = Math.max(0, door.positionAlongWall - halfT);
+      const gapEndT   = Math.min(1, door.positionAlongWall + halfT);
+
+      // Gap endpoints in world coords
+      const gapStartX = p1.x + gapStartT * dx;
+      const gapStartY = p1.y + gapStartT * dy;
+      const gapEndX   = p1.x + gapEndT * dx;
+      const gapEndY   = p1.y + gapEndT * dy;
+
+      // "Inward" perpendicular — toward room centroid
+      const nx = -uy, ny = ux; // left-hand normal
+      const midWallX = (p1.x + p2.x) / 2, midWallY = (p1.y + p2.y) / 2;
+      const dotProd = (cx - midWallX) * nx + (cy - midWallY) * ny;
+      const inwardNx = dotProd > 0 ? nx : -nx;
+      const inwardNy = dotProd > 0 ? ny : -ny;
+
+      const isSelected = selectedDoorId === door.id;
+      const strokeColor = isSelected ? SELECTED_COLOR : DOOR_COLOR;
+      const strokeW = isSelected ? 3 : 2;
+      const dType = door.type || 'single-left'; // fallback
+
+      const createSingleDoor = (hx, hy, fx, fy, panelLen) => {
+        let panelAngleDeg = Math.atan2(fy - hy, fx - hx) * (180 / Math.PI);
+        const crossProduct = (fx - hx) * inwardNy - (fy - hy) * inwardNx;
+        const sweepCW = crossProduct < 0;
+
+        // Panel line
+        shapes.push(
+          <Line
+            key={`door-panel-${door.id}-${hx}`}
+            points={[hx, hy, fx, fy]}
+            stroke={strokeColor}
+            strokeWidth={strokeW + 1}
+            lineCap="round"
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              setSelectedDoorId(door.id);
+              setSelectedId(null);
+            }}
+            onTap={(e) => {
+              e.cancelBubble = true;
+              setSelectedDoorId(door.id);
+              setSelectedId(null);
+            }}
+          />
+        );
+
+        // Arc
+        shapes.push(
+          <Shape
+            key={`door-arc-${door.id}-${hx}`}
+            sceneFunc={(ctx, shape) => {
+              ctx.beginPath();
+              const startAngleRad = panelAngleDeg * (Math.PI / 180);
+              const sweepRad = (sweepCW ? -1 : 1) * (Math.PI / 2);
+              const endAngleRad = startAngleRad + sweepRad;
+              ctx.arc(hx, hy, panelLen, startAngleRad, endAngleRad, sweepCW);
+              ctx.fillStrokeShape(shape);
+            }}
+            stroke={strokeColor}
+            strokeWidth={1.2}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            listening={false}
+          />
+        );
+
+        // Tip line
+        const startAngleRad = panelAngleDeg * (Math.PI / 180);
+        const sweepRad = (sweepCW ? -1 : 1) * (Math.PI / 2);
+        const endAngleRad = startAngleRad + sweepRad;
+        const tipX = hx + panelLen * Math.cos(endAngleRad);
+        const tipY = hy + panelLen * Math.sin(endAngleRad);
+        shapes.push(
+          <Line
+            key={`door-tip-${door.id}-${hx}`}
+            points={[hx, hy, tipX, tipY]}
+            stroke={strokeColor}
+            strokeWidth={1.2}
+            lineCap="round"
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            listening={false}
+          />
+        );
+
+        // Hinge dot
+        shapes.push(
+          <Circle
+            key={`door-hinge-${door.id}-${hx}`}
+            x={hx} y={hy}
+            radius={3}
+            fill={strokeColor}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            listening={false}
+          />
+        );
+      };
+
+      if (dType === 'single-left' || dType === 'single-right' || (dType !== 'double' && dType !== 'sliding')) {
+        const isRight = dType === 'single-right';
+        const legacyRight = door.swingDirection === 'right';
+        const hingeAtEnd = isRight || legacyRight;
+        const hx = hingeAtEnd ? gapEndX : gapStartX;
+        const hy = hingeAtEnd ? gapEndY : gapStartY;
+        const fx = hingeAtEnd ? gapStartX : gapEndX;
+        const fy = hingeAtEnd ? gapStartY : gapEndY;
+        createSingleDoor(hx, hy, fx, fy, doorPx);
+      } else if (dType === 'double') {
+        const midX = (gapStartX + gapEndX) / 2;
+        const midY = (gapStartY + gapEndY) / 2;
+        // Left panel
+        createSingleDoor(gapStartX, gapStartY, midX, midY, doorPx / 2);
+        // Right panel
+        createSingleDoor(gapEndX, gapEndY, midX, midY, doorPx / 2);
+      } else if (dType === 'sliding') {
+        // Two offset lines to indicate sliding doors
+        const midX = (gapStartX + gapEndX) / 2;
+        const midY = (gapStartY + gapEndY) / 2;
+        const offsetDist = 2.5; // px outward/inward
+        const overlap = 4; // px
+
+        shapes.push(
+          <Line
+            key={`door-slide1-${door.id}`}
+            points={[gapStartX + inwardNx * offsetDist, gapStartY + inwardNy * offsetDist, midX + ux * overlap + inwardNx * offsetDist, midY + uy * overlap + inwardNy * offsetDist]}
+            stroke={strokeColor}
+            strokeWidth={strokeW + 1}
+            lineCap="round"
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              setSelectedDoorId(door.id);
+              setSelectedId(null);
+            }}
+          />
+        );
+        shapes.push(
+          <Line
+            key={`door-slide2-${door.id}`}
+            points={[gapEndX - inwardNx * offsetDist, gapEndY - inwardNy * offsetDist, midX - ux * overlap - inwardNx * offsetDist, midY - uy * overlap - inwardNy * offsetDist]}
+            stroke={strokeColor}
+            strokeWidth={strokeW + 1}
+            lineCap="round"
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              setSelectedDoorId(door.id);
+              setSelectedId(null);
+            }}
+          />
+        );
+      }
+    });
+
+    return shapes;
   };
 
   const renderFurnitureShape = useCallback((item) => {
@@ -778,16 +1109,18 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
 
   const staticRoomShapes = useMemo(() => {
     return rooms.map((room, ri) => {
-      const isSelected = ri === selectedRoomIndex;
+      const isSelected = !readOnly && ri === selectedRoomIndex;
       const textureId = room.floorTextureId || 'wood-oak';
       const patternImage = loadedTextures[textureId] || undefined;
 
       const floorPoints = room.points.flatMap(p => [p.x, p.y]);
-      const { walls, labels } = buildWallsAndLabels(room.points, `room${ri}`);
+      const { walls, labels } = buildWallsAndLabels(room.points, `room${ri}`, ri);
+      const doorShapes = buildDoorShapes(ri, room.points);
       const centerX = room.points.reduce((s, p) => s + p.x, 0) / room.points.length;
       const centerY = room.points.reduce((s, p) => s + p.y, 0) / room.points.length;
       return (
         <React.Fragment key={`room-fragment-${ri}`}>
+          {/* Floor fill polygon — ONE continuous closed shape, untouched */}
           <Line
             key={`floor-${ri}`}
             points={floorPoints}
@@ -803,16 +1136,17 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             perfectDrawEnabled={false}
             shadowForStrokeEnabled={false}
             onClick={(e) => { 
-              if (pendingFurniture) return; 
+              if (pendingFurniture || doorPlacementMode) return; 
               e.cancelBubble = true; 
               if (setSelectedRoomIndex) setSelectedRoomIndex(ri); 
             }}
             onTap={(e) => { 
-              if (pendingFurniture) return; 
+              if (pendingFurniture || doorPlacementMode) return; 
               e.cancelBubble = true; 
               if (setSelectedRoomIndex) setSelectedRoomIndex(ri); 
             }}
           />
+          {/* Per-segment wall strokes (split around door gaps) */}
           {walls}
           {isSelected && (
             <Line
@@ -827,6 +1161,8 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             />
           )}
           {labels}
+          {/* Door symbols (panel + swing arc) */}
+          {doorShapes}
           <Text
             key={`rl-${ri}`}
             x={centerX - 40}
@@ -841,7 +1177,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
         </React.Fragment>
       );
     });
-  }, [rooms, loadedTextures, selectedRoomIndex, setSelectedRoomIndex]);
+  }, [rooms, loadedTextures, selectedRoomIndex, setSelectedRoomIndex, doors, selectedDoorId, readOnly]);
 
   // Handlers wrapped in useCallback to preserve furniture memoization
   const handleFurnitureDragMoveCb = useCallback((id, e) => handleFurnitureDragMove(id, e), [placedFurniture, rooms, currentPoints]);
@@ -850,6 +1186,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   const handleFurnitureClickCb = useCallback((e, id) => {
     e.cancelBubble = true;
     setSelectedId(id);
+    setSelectedDoorId(null); // clear door selection when selecting furniture
   }, []);
 
   const lastPoint = currentPoints[currentPoints.length - 1];
@@ -872,38 +1209,37 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
   return (
     <div ref={containerRef} className="room-canvas-shell">
       {/* ══════════ TOP BAR — Planner5D style ══════════ */}
-      <div className="canvas-top-bar">
-
-        <button
-          type="button"
-          onClick={undo}
-          disabled={historyRef.current.length === 0}
-          title="Undo (Ctrl+Z)"
-          className="canvas-icon-button"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={clearAll}
-          title="Clear all"
-          className="canvas-action-button danger canvas-top-action"
-        >
-          ✕
-        </button>
-
-        <div className="canvas-top-spacer" />
-        <span className="canvas-top-status">
-          {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {placedFurniture.length} item{placedFurniture.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+      {!readOnly && (
+        <div className="canvas-top-bar">
+          <button
+            type="button"
+            onClick={undo}
+            disabled={historyRef.current.length === 0}
+            title="Undo (Ctrl+Z)"
+            className="canvas-icon-button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+          </button>
+          <button
+            type="button"
+            onClick={clearAll}
+            title="Clear all"
+            className="canvas-action-button danger canvas-top-action"
+          >
+            ✕
+          </button>
+          <div className="canvas-top-spacer" />
+          <span className="canvas-top-status">
+            {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {placedFurniture.length} item{placedFurniture.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       {/* ══════════ CANVAS AREA ══════════ */}
       <div 
         className="canvas-stage-wrapper"
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
-        onDrop={(e) => {
+        onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={readOnly ? undefined : (e) => {
           e.preventDefault();
           try {
             const data = e.dataTransfer.getData('application/json');
@@ -957,6 +1293,11 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             📐 Click to place: <strong style={{ fontWeight: '500', color: 'var(--text-primary, #f8fafc)' }}>{pendingFurniture.name}</strong>
           </div>
         )}
+        {doorPlacementMode && !pendingFurniture && rooms.length > 0 && (
+          <div className="canvas-toast door-mode">
+            🚪 Click on a wall to place a door
+          </div>
+        )}
 
         <Stage
           ref={stageRef}
@@ -973,6 +1314,27 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             <GridShape />
 
             {staticRoomShapes}
+
+            {/* ── Wall hover highlight (door placement mode) ── */}
+            {doorPlacementMode && hoveredWall && (() => {
+              const room = rooms[hoveredWall.roomIndex];
+              if (!room) return null;
+              const p1 = room.points[hoveredWall.wallIndex];
+              const p2 = room.points[(hoveredWall.wallIndex + 1) % room.points.length];
+              return (
+                <Line
+                  key="hovered-wall-highlight"
+                  points={[p1.x, p1.y, p2.x, p2.y]}
+                  stroke="#22c55e"
+                  strokeWidth={14}
+                  opacity={0.35}
+                  lineCap="round"
+                  listening={false}
+                  perfectDrawEnabled={false}
+                  shadowForStrokeEnabled={false}
+                />
+              );
+            })()}
 
             {pendingRoom && (() => {
               const fp = pendingRoom.points.flatMap(p => [p.x, p.y]);
@@ -1012,31 +1374,41 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
               const catalogItem = FURNITURE_CATALOG.find(f => f.id === item.catalogId);
               const isSelected = item.id === selectedId;
               return (
-                <MemoizedFurnitureItem
+                <Group
                   key={item.id}
-                  item={item}
-                  catalogItem={catalogItem}
-                  isSelected={isSelected}
-                  renderShape={renderFurnitureShape}
-                  setRef={(node) => { 
+                  x={item.x} y={item.y} rotation={item.rotation ?? 0}
+                  ref={(node) => { 
                     if (node) furnitureGroupRefs.current[item.id] = node; 
                     else delete furnitureGroupRefs.current[item.id];
                   }}
-                  onDragMove={(e) => handleFurnitureDragMoveCb(item.id, e)}
-                  onDragEnd={(e) => handleFurnitureDragEndCb(item.id, e)}
-                  onTransformEnd={(e) => handleFurnitureTransformEndCb(item.id, e)}
-                  onClick={(e) => handleFurnitureClickCb(e, item.id)}
-                />
+                  draggable={!readOnly}
+                  onDragMove={readOnly ? undefined : (e) => handleFurnitureDragMoveCb(item.id, e)}
+                  onDragEnd={readOnly ? undefined : (e) => handleFurnitureDragEndCb(item.id, e)}
+                  onTransformEnd={readOnly ? undefined : (e) => handleFurnitureTransformEndCb(item.id, e)}
+                  onClick={readOnly ? undefined : (e) => handleFurnitureClickCb(e, item.id)}
+                >
+                  {catalogItem?.thumbnail
+                    ? <FurnitureIconImage url={catalogItem.thumbnail} width={item.width} height={item.height} />
+                    : renderFurnitureShape(item)}
+                  {isSelected && !readOnly && (
+                    <Rect width={item.width} height={item.height}
+                      stroke="#6b5b95" strokeWidth={2} dash={[4,4]} fill="rgba(107,91,149,0.06)"
+                      perfectDrawEnabled={false} shadowForStrokeEnabled={false}
+                    />
+                  )}
+                </Group>
               );
             })}
 
-            <Transformer
-              ref={transformerRef}
-              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']} rotateEnabled={true}
-              borderStroke="#6b5b95" borderStrokeWidth={1.5} borderDash={[4,4]}
-              anchorStroke="#6b5b95" anchorFill="#fff"
-              anchorSize={8} anchorCornerRadius={4} rotateAnchorOffset={20}
-            />
+            {!readOnly && (
+              <Transformer
+                ref={transformerRef}
+                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']} rotateEnabled={true}
+                borderStroke="#6b5b95" borderStrokeWidth={1.5} borderDash={[4,4]}
+                anchorStroke="#6b5b95" anchorFill="#fff"
+                anchorSize={8} anchorCornerRadius={4} rotateAnchorOffset={20}
+              />
+            )}
           </Layer>
         </Stage>
 
