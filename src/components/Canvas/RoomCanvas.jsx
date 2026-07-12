@@ -4,8 +4,6 @@ import { Stage, Layer, Line, Text, Circle, Rect, Group, Image as KonvaImage, Tra
 import useImage from 'use-image';
 import { FURNITURE_CATALOG } from '../../data/furnitureCatalog';
 import woodTextureImg from '../../assets/textures/wood_floor.png';
-import { useImage } from 'react-konva-utils';
-import woodFloorTexture from '../../assets/floors/wood-oak-floor.png';
 
 const GRID_SIZE = 20;
 const PIXELS_PER_FOOT = 20;
@@ -106,7 +104,6 @@ const MemoizedFurnitureItem = React.memo(({
   );
 });
 
-const [floorImage] = useImage(woodFloorTexture);
 
 const GRID_RANGE = 3000;
 const GridShape = () => (
@@ -770,6 +767,7 @@ function RoomCanvas({ pendingFurniture, onFurniturePlaced, placedFurniture, setP
             fillPatternImage={woodPattern}
             fillPatternRepeat="repeat"
             fillPatternScale={{ x: 0.2, y: 0.2 }}
+            fillPriority={woodPattern ? 'pattern' : 'color'}
             fill="#d2a96e"
             stroke="#334155"
             strokeWidth={1}
