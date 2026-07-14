@@ -129,16 +129,17 @@ const GridShape = () => (
   />
 );
 
-function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurniture, setPlacedFurniture, rooms, setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick, doors = [], setDoors, doorPlacementMode, setDoorPlacementMode, pendingDoorType, pendingDoorWidth, readOnly = false }) {
+function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurniture = [], setPlacedFurniture, rooms = [], setRooms, selectedRoomIndex, setSelectedRoomIndex, onSaveClick, onSaveAsClick, onLoadClick, doors = [], setDoors, doorPlacementMode, setDoorPlacementMode, pendingDoorType, pendingDoorWidth, readOnly = false, history, currentPoints = [], setCurrentPoints, onError }) {
   // Canvas container ref — used by ResizeObserver for dynamic Stage sizing
   const containerRef = useRef(null);
   const stageRef = useRef(null);           // ref to Konva Stage for zoom controls
+  const lastDist = useRef(0);
+  const lastCenter = useRef(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 500 });
   // Refs for the Konva Transformer and each placed furniture Group node.
   const transformerRef = useRef(null);
   const furnitureGroupRefs = useRef({});
   // rooms / setRooms lifted to App.jsx so App can save/load them
-  const [currentPoints, setCurrentPoints] = useState([]);
   const [mousePos, setMousePos] = useState(null);
   // true when the cursor is close enough to the first point to auto-close
   const [nearFirstPoint, setNearFirstPoint] = useState(false);
@@ -233,30 +234,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     });
   }, []);
 
-  // ── Undo history ────────────────────────────────────────────────────────────
-  // Each entry is a full snapshot: { rooms, currentPoints, placedFurniture }.
-  // We never store pendingRoom snapshots — naming dialog is transient UI.
-  const historyRef = useRef([]);
-
-  /** Save a snapshot before every mutating action. */
-  const pushHistory = (snap) => {
-    historyRef.current = [
-      ...historyRef.current.slice(-49), // keep last 50 states
-      snap,
-    ];
-  };
-
-  const undo = () => {
-    if (historyRef.current.length === 0) return;
-    const prev = historyRef.current[historyRef.current.length - 1];
-    historyRef.current = historyRef.current.slice(0, -1);
-    setRooms(prev.rooms);
-    setCurrentPoints(prev.currentPoints);
-    setPlacedFurniture(prev.placedFurniture);
-    setSelectedId(null);
-    setPendingRoom(null); // close naming dialog if open
-  };
-  // ────────────────────────────────────────────────────────────────────────────
+  // Internal undo has been replaced by EditorView's useHistory hook
 
   // ── Point-in-polygon (ray casting) ──────────────────────────────────────────
   // Returns true if (px, py) is strictly inside the polygon defined by `points`.
@@ -347,6 +325,57 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     });
   };
 
+  const handleTouchMove = (e) => {
+    // If not doing multi-touch, just handle drawing logic
+    if (e.evt.touches.length < 2) {
+      handleMouseMove(e);
+      return;
+    }
+    e.evt.preventDefault();
+    const touch1 = e.evt.touches[0];
+    const touch2 = e.evt.touches[1];
+
+    if (stageRef.current && stageRef.current.isDragging()) {
+      stageRef.current.stopDrag();
+    }
+    const p1 = { x: touch1.clientX, y: touch1.clientY };
+    const p2 = { x: touch2.clientX, y: touch2.clientY };
+    const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    const center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+    if (!lastDist.current) {
+      lastDist.current = dist;
+      lastCenter.current = center;
+      return;
+    }
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+    const oldScale = stage.scaleX();
+    const scaleBy = dist / lastDist.current;
+    const newScale = Math.max(0.1, Math.min(oldScale * scaleBy, 10));
+    
+    const mousePointTo = {
+      x: (center.x - stage.x()) / oldScale,
+      y: (center.y - stage.y()) / oldScale,
+    };
+    
+    stage.scale({ x: newScale, y: newScale });
+    stage.position({
+      x: center.x - mousePointTo.x * newScale,
+      y: center.y - mousePointTo.y * newScale,
+    });
+    stage.batchDraw();
+    
+    lastDist.current = dist;
+    lastCenter.current = center;
+  };
+
+  const handleTouchEnd = () => {
+    lastDist.current = 0;
+    lastCenter.current = null;
+  };
+
   // ── Wheel zoom — centered on cursor, 0.3× – 4× range ────────────────────
   const handleWheel = (e) => {
     e.evt.preventDefault();
@@ -419,7 +448,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     if (doorPlacementMode && !pendingFurniture) {
       if (!pendingDoorType) {
         // User clicked but hasn't selected a door type yet
-        alert('Please select a Door Type from the catalog first.');
+        if (onError) onError('Please select a Door Type from the catalog first.', false);
         return;
       }
       const pos = e.target.getStage().getRelativePointerPosition();
@@ -451,7 +480,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
         type: pendingDoorType,
       };
 
-      pushHistory({ rooms, currentPoints, placedFurniture });
+
       setDoors(prev => [...prev, newDoor]);
       setDoorPlacementMode(false); // exit after placing one
       setHoveredWall(null);
@@ -466,7 +495,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       const { x: snappedX, y: snappedY } = applySnap(pos.x, pos.y, width, height);
 
       if (hasCollision(null, snappedX, snappedY, width, height, placedFurniture)) {
-        alert('Cannot place furniture here — it overlaps another item.');
+        if (onError) onError('Cannot place furniture here - it overlaps another item.', false);
         return;
       }
 
@@ -482,7 +511,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
         price: pendingFurniture.price,
         rotation: 0,
       };
-      pushHistory({ rooms, currentPoints, placedFurniture });
+
       setPlacedFurniture([...placedFurniture, newItem]);
       onFurniturePlaced();
       return;
@@ -512,7 +541,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     const lastPoint = currentPoints[currentPoints.length - 1];
     if (lastPoint && lastPoint.x === snappedX && lastPoint.y === snappedY) return;
 
-    pushHistory({ rooms, currentPoints, placedFurniture });
+
     setCurrentPoints([...currentPoints, { x: snappedX, y: snappedY }]);
     setSelectedId(null);
   };
@@ -545,7 +574,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
 
   const finishRoom = () => {
     if (currentPoints.length < 3) {
-      alert('Add at least 3 points to form a room.');
+      if (onError) onError('Add at least 3 points to form a room.', false);
       return;
     }
     setPendingRoom({ points: currentPoints });
@@ -632,7 +661,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       return;
     }
 
-    pushHistory({ rooms, currentPoints, placedFurniture });
+
     setPlacedFurniture(placedFurniture.map(f =>
       f.id === id ? { ...f, x: snappedX, y: snappedY } : f
     ));
@@ -680,7 +709,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       return;
     }
 
-    pushHistory({ rooms, currentPoints, placedFurniture });
+
     setPlacedFurniture(prev =>
       prev.map(f => f.id === id ? { ...f, rotation: newRotation, width: newWidth, height: newHeight } : f)
     );
@@ -688,13 +717,13 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
 
   const handleDeleteSelected = () => {
     if (selectedDoorId) {
-      pushHistory({ rooms, currentPoints, placedFurniture });
+
       setDoors(prev => prev.filter(d => d.id !== selectedDoorId));
       setSelectedDoorId(null);
       return;
     }
     if (!selectedId) return;
-    pushHistory({ rooms, currentPoints, placedFurniture });
+
     setPlacedFurniture(placedFurniture.filter(f => f.id !== selectedId));
     setSelectedId(null);
   };
@@ -703,9 +732,6 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     const handleKeyDown = (e) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         handleDeleteSelected();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        undo();
       } else if (e.key === 'Escape' && doorPlacementMode) {
         setDoorPlacementMode(false);
         setHoveredWall(null);
@@ -730,9 +756,8 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     transformerRef.current.getLayer()?.batchDraw();
   }, [selectedId, placedFurniture]);
 
-  // Push history before confirming a room name so the completed room is undoable.
+  // Confirm room name helper
   const confirmRoomNameWithHistory = () => {
-    pushHistory({ rooms, currentPoints, placedFurniture });
     confirmRoomName();
   };
 
@@ -1287,12 +1312,21 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
         <div className="canvas-top-bar">
           <button
             type="button"
-            onClick={undo}
-            disabled={historyRef.current.length === 0}
+            onClick={history.undo}
+            disabled={!history.canUndo}
             title="Undo (Ctrl+Z)"
             className="canvas-icon-button"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 14-5-5 5-5"/><path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5A5.5 5.5 0 0 1 14.5 20H11"/></svg>
+          </button>
+          <button
+            type="button"
+            onClick={history.redo}
+            disabled={!history.canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="canvas-icon-button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg>
           </button>
           <button
             type="button"
@@ -1336,7 +1370,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
             const { x: snappedX, y: snappedY } = applySnap(worldX, worldY, width, height);
 
             if (hasCollision(null, snappedX, snappedY, width, height, placedFurniture)) {
-              alert('Cannot place furniture here - it overlaps another item.');
+              if (onError) onError('Cannot place furniture here - it overlaps another item.', false);
               return;
             }
             
@@ -1352,7 +1386,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
               price: item.price,
               rotation: 0
             };
-            pushHistory({ rooms, currentPoints, placedFurniture });
+
             setPlacedFurniture(prev => [...prev, newItem]);
             if (onFurniturePlaced) onFurniturePlaced();
           } catch (err) {
@@ -1379,7 +1413,10 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
           height={stageSize.height}
           draggable
           onClick={handleStageClick}
+          onTap={handleStageClick}
           onMouseMove={handleMouseMove}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           onDblClick={handleDoubleClick}
           onWheel={handleWheel}
           className="canvas-stage"

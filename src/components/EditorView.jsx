@@ -8,6 +8,9 @@ import {
   loadDesign, deleteDesign, createSharedProject
 } from '../utils/saveLoad';
 import { exportAsImage, exportAsPDF } from '../utils/exportUtils';
+import { useHistory } from '../hooks/useHistory';
+import { findOverlappingRooms, findFurnitureOutOfBounds, validateForExport } from '../utils/validation';
+import EdgeCaseBanner from './EdgeCaseBanner';
 
 const userId = getOrCreateUserId();
 
@@ -21,11 +24,48 @@ function fmtDate(date) {
 
 export default function EditorView() {
   // ── Shared canvas state ──────────────────────────────────────────────
-  const [rooms,            setRooms]            = useState([]);
+  const history = useHistory({
+    rooms: (() => { try { const saved = localStorage.getItem('floorplan_rooms'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
+    placedFurniture: (() => { try { const saved = localStorage.getItem('floorplan_furniture'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
+    doors: (() => { try { const saved = localStorage.getItem('floorplan_doors'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
+    currentPoints: []
+  });
+
+  const rooms = history.state.rooms;
+  const placedFurniture = history.state.placedFurniture;
+  const doors = history.state.doors;
+  const currentPoints = history.state.currentPoints;
+
+  const setRooms = useCallback((updater) => {
+    history.set((prev) => ({
+      ...prev,
+      rooms: typeof updater === 'function' ? updater(prev.rooms) : updater
+    }));
+  }, [history]);
+
+  const setPlacedFurniture = useCallback((updater) => {
+    history.set((prev) => ({
+      ...prev,
+      placedFurniture: typeof updater === 'function' ? updater(prev.placedFurniture) : updater
+    }));
+  }, [history]);
+
+  const setDoors = useCallback((updater) => {
+    history.set((prev) => ({
+      ...prev,
+      doors: typeof updater === 'function' ? updater(prev.doors) : updater
+    }));
+  }, [history]);
+
+  const setCurrentPoints = useCallback((updater) => {
+    history.set((prev) => ({
+      ...prev,
+      currentPoints: typeof updater === 'function' ? updater(prev.currentPoints) : updater
+    }));
+  }, [history]);
+
   const [pendingFurniture, setPendingFurniture] = useState(null);
-  const [placedFurniture,  setPlacedFurniture]  = useState([]);
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(null);
-  const [doors,            setDoors]            = useState([]);
   const [doorPlacementMode, setDoorPlacementMode] = useState(false);
   const [pendingDoorType,   setPendingDoorType]   = useState(null); // e.g. 'single-left', wait until selected
   const [pendingDoorWidth,  setPendingDoorWidth]  = useState(3); // default 3 ft
@@ -37,6 +77,13 @@ export default function EditorView() {
   useEffect(() => { roomsRef.current  = rooms; },           [rooms]);
   useEffect(() => { placedRef.current = placedFurniture; }, [placedFurniture]);
   useEffect(() => { doorsRef.current  = doors; },           [doors]);
+
+  // Auto-save to localStorage
+  useEffect(() => {
+    localStorage.setItem('floorplan_rooms', JSON.stringify(rooms));
+    localStorage.setItem('floorplan_furniture', JSON.stringify(placedFurniture));
+    localStorage.setItem('floorplan_doors', JSON.stringify(doors));
+  }, [rooms, placedFurniture, doors]);
 
   // ── Modal / UI state ─────────────────────────────────────────────────
   const [modal,       setModal]       = useState(null); // 'save' | 'load' | null
@@ -82,10 +129,11 @@ export default function EditorView() {
   };
 
   const generateShareLink = async () => {
-    console.log('[generateShareLink] Triggered!');
+    const v = validateForExport(rooms, placedFurniture);
+    if (!v.valid) { setToast(v.error); return; }
+    
     setSaving(true);
     try {
-      console.log('[generateShareLink] About to call createSharedProject (Firestore write)...');
       const docId = await createSharedProject(rooms, placedFurniture, doors);
       setShareUrl(window.location.origin + '/view/' + docId);
       showToast('✅ Share link generated!');
@@ -95,12 +143,11 @@ export default function EditorView() {
 
   // ── Quick-save (Ctrl+S) ───────────────────────────────────────────────
   const quickSave = useCallback(async () => {
-    const name = `Design — ${new Date().toLocaleString('en-IN', {
-      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-    })}`;
     try {
-      await saveDesign(userId, name, roomsRef.current, placedRef.current, doorsRef.current);
-      showToast(`✅ Saved as "${name}"`);
+      localStorage.setItem('floorplan_rooms', JSON.stringify(roomsRef.current));
+      localStorage.setItem('floorplan_furniture', JSON.stringify(placedRef.current));
+      localStorage.setItem('floorplan_doors', JSON.stringify(doorsRef.current));
+      showToast(`✅ Progress saved locally!`);
     } catch (e) { showToast('❌ Save failed: ' + e.message, false); }
   }, [showToast]);
 
@@ -132,13 +179,19 @@ export default function EditorView() {
   };
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────
-  // Defined AFTER openLoadModal & quickSave to avoid TDZ
   useEffect(() => {
     const onKey = (e) => {
       const ctrl = e.ctrlKey || e.metaKey;
       if (!ctrl) return;
       const key = e.key.toLowerCase();
-      if (key === 's') {
+      if (key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          history.redo();
+        } else {
+          history.undo();
+        }
+      } else if (key === 's') {
         e.preventDefault();
         e.shiftKey ? (setSaveName(''), setModal('save')) : quickSave();
       } else if (key === 'o') {
@@ -164,9 +217,9 @@ export default function EditorView() {
             className="top-pill" 
             onClick={quickSave}
             title="Save Project"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)', color: 'var(--accent-purple)', border: '1px solid var(--border-input)', padding: '8px 12px' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--accent-green)', color: 'white', border: 'none', padding: '8px 16px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '14px', borderRadius: '8px', cursor: 'pointer' }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            Save
           </button>
           <div style={{ position: 'relative', zIndex: 1000 }}>
             <button 
@@ -181,6 +234,8 @@ export default function EditorView() {
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '8px', background: 'var(--bg-panel)', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '8px', width: '240px', zIndex: 100, fontFamily: 'Inter, system-ui, sans-serif' }}>
                 <div onClick={async () => { 
                   setShareOpen(false); 
+                  const v = validateForExport(rooms, placedFurniture);
+                  if (!v.valid) { setToast(v.error); return; }
                   if (!canvasRef.current) return;
                   const dataUrl = await canvasRef.current.captureFullView();
                   const name = rooms.length > 0 ? (rooms.length === 1 ? 'Room 1' : `${rooms.length} Rooms Design`) : 'Empty Design';
@@ -191,6 +246,8 @@ export default function EditorView() {
                 </div>
                 <div onClick={async () => { 
                   setShareOpen(false); 
+                  const v = validateForExport(rooms, placedFurniture);
+                  if (!v.valid) { setToast(v.error); return; }
                   if (!canvasRef.current) return;
                   const dataUrl = await canvasRef.current.captureFullView();
                   const name = rooms.length > 0 ? (rooms.length === 1 ? 'Room 1' : `${rooms.length} Rooms Design`) : 'Empty Design';
@@ -228,7 +285,11 @@ export default function EditorView() {
           />
         </div>
 
-        <div className="app-canvas-area">
+        <div className="app-canvas-area" style={{ position: 'relative' }}>
+          <EdgeCaseBanner 
+            overlappingRooms={findOverlappingRooms(rooms)} 
+            furnitureOutOfBounds={findFurnitureOutOfBounds(rooms, placedFurniture)} 
+          />
           <Canvas
             exportRef={canvasRef}
             pendingFurniture={pendingFurniture}
@@ -249,6 +310,10 @@ export default function EditorView() {
             pendingDoorType={pendingDoorType}
             pendingDoorWidth={pendingDoorWidth}
             setPendingDoorType={setPendingDoorType}
+            history={history}
+            onError={showToast}
+            currentPoints={currentPoints}
+            setCurrentPoints={setCurrentPoints}
           />
         </div>
         <div className="app-sidebar-right">

@@ -902,13 +902,13 @@ body {
   display: grid;
   place-items: center;
   margin-bottom: 8px;
-  padding: 8px;
+  padding: 4px;
   border: 1px solid var(--border-light);
 }
 
 .catalog-thumb img {
-  width: 60px;
-  height: 60px;
+  width: 90%;
+  height: 90%;
   object-fit: contain;
 }
 
@@ -1819,3 +1819,11 @@ body {
   color: var(--accent-green);
 }
 
+
+/* Enforce desktop layout structure across all devices */
+.app-shell {
+  min-width: 1024px;
+}
+.app-content {
+  overflow-x: auto;
+}
