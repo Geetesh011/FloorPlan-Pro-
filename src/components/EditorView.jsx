@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import '../App.css';
 import Canvas from './Canvas/RoomCanvas';
 import LeftSidebar from './Sidebar/LeftSidebar';
 import BudgetPanel from './Sidebar/BudgetPanel';
 import {
   getOrCreateUserId, saveDesign, listDesigns,
-  loadDesign, deleteDesign, createSharedProject
+  loadDesign, deleteDesign, createSharedProject,
+  loadProject, saveProject, renameProject
 } from '../utils/saveLoad';
 import { exportAsImage, exportAsPDF } from '../utils/exportUtils';
 import { useHistory } from '../hooks/useHistory';
 import { findOverlappingRooms, findFurnitureOutOfBounds, validateForExport } from '../utils/validation';
 import EdgeCaseBanner from './EdgeCaseBanner';
+import { useAuth } from '../context/AuthContext';
 
 const userId = getOrCreateUserId();
 
@@ -23,11 +26,21 @@ function fmtDate(date) {
 }
 
 export default function EditorView() {
+  const { id: projectId } = useParams();         // route: /project/:id
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
+
+  // ── Project load state ────────────────────────────────────────────────
+  const [projectName,    setProjectName]    = useState('Untitled Project');
+  const [projectLoading, setProjectLoading] = useState(!!projectId);
+  const [autosaveStatus, setAutosaveStatus] = useState(''); // '' | 'saving' | 'saved'
+  const autosaveTimer = useRef(null);
+
   // ── Shared canvas state ──────────────────────────────────────────────
   const history = useHistory({
-    rooms: (() => { try { const saved = localStorage.getItem('floorplan_rooms'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
-    placedFurniture: (() => { try { const saved = localStorage.getItem('floorplan_furniture'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
-    doors: (() => { try { const saved = localStorage.getItem('floorplan_doors'); return saved ? JSON.parse(saved) : []; } catch { return []; } })(),
+    rooms: [],
+    placedFurniture: [],
+    doors: [],
     currentPoints: []
   });
 
@@ -78,11 +91,52 @@ export default function EditorView() {
   useEffect(() => { placedRef.current = placedFurniture; }, [placedFurniture]);
   useEffect(() => { doorsRef.current  = doors; },           [doors]);
 
-  // Auto-save to localStorage
+  // ── Load project from Firestore on mount ─────────────────────────────
   useEffect(() => {
-    localStorage.setItem('floorplan_rooms', JSON.stringify(rooms));
-    localStorage.setItem('floorplan_furniture', JSON.stringify(placedFurniture));
-    localStorage.setItem('floorplan_doors', JSON.stringify(doors));
+    if (!projectId) return;
+    let cancelled = false;
+    setProjectLoading(true);
+    loadProject(projectId)
+      .then(({ name, roomData }) => {
+        if (cancelled) return;
+        setProjectName(name);
+        history.set(() => ({
+          rooms:           roomData.rooms           ?? [],
+          placedFurniture: roomData.placedFurniture ?? [],
+          doors:           roomData.doors           ?? [],
+          currentPoints:   [],
+        }));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        showToast('❌ Could not load project: ' + e.message, false);
+        navigate('/dashboard');
+      })
+      .finally(() => { if (!cancelled) setProjectLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // ── Debounced autosave to Firestore (2 s after last edit) ────────────
+  useEffect(() => {
+    if (!projectId || projectLoading) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      setAutosaveStatus('saving');
+      try {
+        await saveProject(projectId, {
+          rooms:           roomsRef.current,
+          placedFurniture: placedRef.current,
+          doors:           doorsRef.current,
+        });
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus(''), 2000);
+      } catch {
+        setAutosaveStatus('');
+      }
+    }, 2000);
+    return () => clearTimeout(autosaveTimer.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rooms, placedFurniture, doors]);
 
   // ── Modal / UI state ─────────────────────────────────────────────────
@@ -141,15 +195,39 @@ export default function EditorView() {
     finally { setSaving(false); }
   };
 
-  // ── Quick-save (Ctrl+S) ───────────────────────────────────────────────
+  // ── Quick-save / manual save button (Ctrl+S) ─────────────────────────
   const quickSave = useCallback(async () => {
     try {
-      localStorage.setItem('floorplan_rooms', JSON.stringify(roomsRef.current));
-      localStorage.setItem('floorplan_furniture', JSON.stringify(placedRef.current));
-      localStorage.setItem('floorplan_doors', JSON.stringify(doorsRef.current));
-      showToast(`✅ Progress saved locally!`);
+      let thumbnailUrl = null;
+      if (canvasRef.current) {
+        try {
+          thumbnailUrl = await canvasRef.current.captureFullView();
+        } catch (e) {
+          console.warn("Could not capture thumbnail", e);
+        }
+      }
+
+      if (projectId) {
+        // Authenticated project → save to Firestore immediately
+        setAutosaveStatus('saving');
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+        await saveProject(projectId, {
+          rooms:           roomsRef.current,
+          placedFurniture: placedRef.current,
+          doors:           doorsRef.current,
+        }, thumbnailUrl);
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus(''), 2000);
+        showToast('✅ Project saved!');
+      } else {
+        // Fallback: save to localStorage
+        localStorage.setItem('floorplan_rooms', JSON.stringify(roomsRef.current));
+        localStorage.setItem('floorplan_furniture', JSON.stringify(placedRef.current));
+        localStorage.setItem('floorplan_doors', JSON.stringify(doorsRef.current));
+        showToast('✅ Progress saved locally!');
+      }
     } catch (e) { showToast('❌ Save failed: ' + e.message, false); }
-  }, [showToast]);
+  }, [showToast, projectId]);
 
   // ── Open load modal ───────────────────────────────────────────────────
   const openLoadModal = useCallback(async () => {
@@ -209,7 +287,51 @@ export default function EditorView() {
     <div className="app-shell">
       <header className="app-top-bar">
         <div className="app-top-brand">
-          <span className="app-logo">FloorPlan Pro</span>
+          <span
+            className="app-logo"
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => navigate('/dashboard')}
+            title="Back to Dashboard"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+            FloorPlan Pro
+          </span>
+          {projectId && (
+            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 400, marginRight: '4px' }}>/</span>
+              <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                onBlur={async (e) => {
+                  e.target.style.borderBottom = '1px solid transparent';
+                  const finalName = projectName.trim() || 'Untitled Project';
+                  if (!projectName.trim()) setProjectName(finalName);
+                  try {
+                    await renameProject(projectId, finalName);
+                  } catch(err) {
+                    showToast('❌ Failed to rename project', false);
+                  }
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderBottom = '1px solid var(--accent-green)';
+                  e.target.select();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.target.blur();
+                }}
+                style={{
+                  background: 'transparent', border: 'none', borderBottom: '1px solid transparent',
+                  fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'inherit',
+                  padding: '2px 4px', outline: 'none', minWidth: '150px', transition: 'border-color 0.2s',
+                  cursor: 'text'
+                }}
+                title="Rename project"
+              />
+            </div>
+          )}
         </div>
         <div className="app-top-actions">
           <button 
@@ -263,9 +385,85 @@ export default function EditorView() {
               </div>
             )}
           </div>
-          <div className="top-avatar">V</div>
+
+          {/* Autosave status */}
+          {autosaveStatus && (
+            <span style={{ fontSize: '12px', color: autosaveStatus === 'saving' ? '#9ca3af' : '#16a34a', fontWeight: 500 }}>
+              {autosaveStatus === 'saving' ? '⟳ Saving…' : '✓ Saved'}
+            </span>
+          )}
+
+          {/* User avatar + dropdown — Step 6 */}
+          {(() => {
+            const name = currentUser?.displayName || currentUser?.email || '';
+            const parts = name.trim().split(/\s+/);
+            const initials = parts.length >= 2
+              ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+              : name.slice(0, 2).toUpperCase() || 'U';
+            return (
+              <div style={{ position: 'relative' }}>
+                <div
+                  className="top-avatar"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setModal(modal === 'profile' ? null : 'profile')}
+                  title={currentUser?.displayName || currentUser?.email}
+                >
+                  {initials}
+                </div>
+                {modal === 'profile' && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setModal(null)} />
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-40 overflow-hidden transform opacity-100 scale-100 transition-all duration-200" style={{ top: '44px' }}>
+                      <div className="px-5 py-4 bg-gray-50/50">
+                        <div className="font-semibold text-[15px] text-gray-900 truncate">{currentUser?.displayName || 'User'}</div>
+                        <div className="text-[13px] text-gray-500 mt-0.5 truncate">{currentUser?.email}</div>
+                      </div>
+                      <div className="h-px bg-gray-100 w-full" />
+                      <div className="py-2">
+                        <button className="flex items-center justify-between w-full px-5 py-2.5 text-[14.5px] text-gray-700 hover:bg-gray-50 hover:text-green-600 transition-colors text-left" onClick={() => setModal(null)}>
+                          My Profile
+                        </button>
+                        <button className="flex items-center justify-between w-full px-5 py-2.5 text-[14.5px] text-gray-700 hover:bg-gray-50 hover:text-green-600 transition-colors text-left" onClick={() => setModal(null)}>
+                          Subscription 
+                          <span className="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Free</span>
+                        </button>
+                        <button className="flex items-center justify-between w-full px-5 py-2.5 text-[14.5px] text-gray-700 hover:bg-gray-50 hover:text-green-600 transition-colors text-left" onClick={() => setModal(null)}>
+                          Account Settings
+                        </button>
+                      </div>
+                      <div className="h-px bg-gray-100 w-full" />
+                      <div className="py-2">
+                        <button className="flex items-center justify-between w-full px-5 py-2.5 text-[14.5px] text-red-500 hover:bg-red-50 transition-colors text-left font-medium" 
+                          onClick={() => { 
+                            setModal(null); 
+                            navigate('/'); 
+                            setTimeout(() => { logout(); }, 0); 
+                          }}>
+                          Log out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </header>
+
+      {/* Project loading overlay */}
+      {projectLoading && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        }}>
+          <div style={{ fontSize: '36px', marginBottom: '16px' }}>📐</div>
+          <div style={{ fontSize: '16px', fontWeight: 600, color: '#374151' }}>Loading project…</div>
+          <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '6px' }}>{projectName}</div>
+        </div>
+      )}
 
       <div className="app-content">
         <div className="app-sidebar-left">

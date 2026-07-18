@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Authenticated projects ────────────────────────────────────────────
+    // Only the owner can read/write their own projects
+    match /projects/{projectId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == resource.data.ownerId;
+      // Allow create: the new doc will have ownerId set to the requesting uid
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ── Shared (read-only) projects ───────────────────────────────────────
+    // Anyone can read a shared project link; only auth users can create them
+    match /sharedProjects/{docId} {
+      allow read:  if true;
+      allow create: if request.auth != null;
+    }
+
+    // ── Legacy anonymous designs ──────────────────────────────────────────
+    // Allow the anonymous userId stored in localStorage to read/write
+    match /floorplans/{userId}/designs/{designId} {
+      allow read, write: if true;  // open for now; tighten after auth migration
+    }
+  }
+}

@@ -43,8 +43,14 @@ export function findFurnitureOutOfBounds(rooms, placedFurniture) {
 
   const outOfBounds = [];
   placedFurniture.forEach(f => {
-    // Check center point of furniture
-    const center = { x: f.x + f.width / 2, y: f.y + f.height / 2 };
+    // Check true center point of furniture, accounting for rotation
+    const rad = (f.rotation || 0) * Math.PI / 180;
+    const cxLocal = f.width / 2;
+    const cyLocal = f.height / 2;
+    const center = { 
+      x: f.x + cxLocal * Math.cos(rad) - cyLocal * Math.sin(rad), 
+      y: f.y + cxLocal * Math.sin(rad) + cyLocal * Math.cos(rad) 
+    };
     const inAnyRoom = rooms.some(r => isInside(center, r.points));
     if (!inAnyRoom) {
       outOfBounds.push(f);

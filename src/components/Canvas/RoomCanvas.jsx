@@ -210,7 +210,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       const stageElement = document.querySelector('.canvas-stage');
       const canvas = await html2canvas(stageElement, {
         useCORS: true,
-        scale: 2,
+        scale: 0.5, // Reduce scale for much smaller thumbnail
         backgroundColor: '#f8fafc',
       });
       
@@ -219,7 +219,8 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       setSelectedRoomIndex(oldSelection);
       stage.batchDraw();
       
-      return canvas.toDataURL('image/png');
+      // Use JPEG with 0.5 quality to ensure the base64 string is well under Firestore's 1MB limit
+      return canvas.toDataURL('image/jpeg', 0.5);
     }
   }));
 
@@ -604,6 +605,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     setMousePos(null);
     setPlacedFurniture([]);
     setSelectedId(null);
+    if (setDoors) setDoors([]);
   };
 
   const handleFurnitureDragMove = (id, e) => {
