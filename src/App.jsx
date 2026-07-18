@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LandingPage from './components/landing/LandingPage';
 import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorView from './components/EditorView';
 import SharedProjectView from './components/SharedProjectView';
@@ -16,6 +17,7 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/" element={<LandingPage isLoggedIn={!!currentUser} />} />
       <Route path="/login"  element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
 
       {/* Protected routes */}
       <Route path="/dashboard" element={

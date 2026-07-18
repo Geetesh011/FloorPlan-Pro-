@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "floorplan-pro-12512": {
+      "hosting": {
+        "myfloorplanpro": [
+          "myfloorplanpro"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
