@@ -3,7 +3,8 @@ import { FURNITURE_CATALOG } from "../../data/furnitureCatalog";
 export const FurnitureMarquee = () => {
   // We duplicate the catalog several times to ensure the row is wide enough to cover any screen width.
   // The animation will translate the container by -50%, so the content must be identical in both halves.
-  const baseList = [...FURNITURE_CATALOG, ...FURNITURE_CATALOG, ...FURNITURE_CATALOG];
+  const displayItems = FURNITURE_CATALOG.filter(item => !['toilet', 'sink'].includes(item.id));
+  const baseList = [...displayItems, ...displayItems, ...displayItems, ...displayItems];
   const items = [...baseList, ...baseList];
 
   return (

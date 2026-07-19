@@ -32,10 +32,10 @@ function FurnitureIconImage({ url, width, height }) {
         const res  = await fetch(url);
         let svg    = await res.text();
 
-        // Patch the opening <svg …> tag: remove old width/height, add ours
+        // Patch the opening <svg …> tag: remove old width/height/preserveAspectRatio, add ours
         svg = svg.replace(/<svg([^>]*)>/, (_, attrs) => {
-          const cleaned = attrs.replace(/\s*(width|height)\s*=\s*"[^"]*"/gi, '');
-          return `<svg${cleaned} width="${Math.round(width)}" height="${Math.round(height)}">`;
+          const cleaned = attrs.replace(/\s*(width|height|preserveAspectRatio)\s*=\s*"[^"]*"/gi, '');
+          return `<svg${cleaned} width="${Math.round(width)}" height="${Math.round(height)}" preserveAspectRatio="none">`;
         });
 
         blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
