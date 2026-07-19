@@ -19,7 +19,7 @@ export const ShowcaseVideo = () => {
           <div className="absolute top-6 -right-6 w-full h-full bg-white border border-gray-100 rounded-3xl shadow-sm hidden sm:block"></div>
           
           {/* Main image container */}
-          <div className="relative z-10 w-full aspect-[4/3] sm:aspect-video bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] overflow-hidden border border-gray-200 flex items-center justify-center">
+          <div className="relative z-10 w-full aspect-[4/3] sm:aspect-video bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 flex items-center justify-center">
             <img 
               src="/living-room.png" 
               alt="Living Room FloorPlan" 

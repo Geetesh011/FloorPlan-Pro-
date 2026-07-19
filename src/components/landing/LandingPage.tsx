@@ -5,6 +5,7 @@ import { ShowcaseVideo } from "./ShowcaseVideo";
 import { Features } from "./Features";
 import { HowItWorks } from "./HowItWorks";
 import { Footer } from "./Footer";
+import { FurnitureMarquee } from "./FurnitureMarquee";
 
 interface LandingPageProps {
   isLoggedIn?: boolean;
@@ -17,6 +18,7 @@ export default function LandingPage({ isLoggedIn = false }: LandingPageProps) {
       <Hero isLoggedIn={isLoggedIn} />
       <ShowcaseVideo />
       <Features />
+      <FurnitureMarquee />
       <HowItWorks />
       <Footer />
     </div>

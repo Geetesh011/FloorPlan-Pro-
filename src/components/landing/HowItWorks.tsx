@@ -43,11 +43,8 @@ const steps: StepProps[] = [
 export const HowItWorks = () => {
   return (
     <section id="how-it-works" className="w-full flex flex-col items-center py-24 sm:py-32 px-4">
-      <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-[#333] mb-4 text-center hover:text-[#1bc650] transition-colors duration-300 cursor-default">
-        How it{" "}
-        <span className="text-[#1de25b]">
-          works
-        </span>
+      <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-black mb-4 text-center hover:text-[#1bc650] transition-colors duration-300 cursor-default">
+        How it works
       </h2>
       <p className="text-center md:w-3/4 mx-auto mb-12 text-xl text-muted-foreground">
         From blank canvas to client-ready proposal in four steps — no CAD
@@ -56,7 +53,7 @@ export const HowItWorks = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-7xl mx-auto pt-8">
         {steps.map(({ icon, step, title, description }) => (
-          <Card key={title} className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2 relative overflow-hidden text-left">
+          <Card key={title} className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2 relative overflow-hidden text-left">
             <div className="absolute top-4 right-4 text-7xl font-black text-green-50 select-none -z-10">
               {step}
             </div>

@@ -1,7 +1,7 @@
 {
   "hosting": [
     {
-      "target": "myfloorplanpro",
+      "site": "myfloorplanpro",
       "public": "dist",
       "ignore": [
         "firebase.json",

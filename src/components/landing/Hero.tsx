@@ -68,7 +68,7 @@ export const Hero = ({ isLoggedIn = false }: HeroProps) => {
         
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 w-full">
           {/* Room stats card */}
-          <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
+          <Card className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
           <CardHeader className="flex flex-row items-center gap-4 pb-4">
             <div className="bg-green-100/70 p-3 rounded-xl">
               <LayoutDashboard className="w-6 h-6 text-green-600" />
@@ -84,14 +84,14 @@ export const Hero = ({ isLoggedIn = false }: HeroProps) => {
         </Card>
 
         {/* Budget card */}
-        <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
+        <Card className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
           <CardHeader className="pb-4 text-left">
             <CardTitle className="flex items-center justify-between text-[17px] font-bold">
               Live Budget
               <Badge variant="secondary" className="text-green-700 bg-green-100/80 hover:bg-green-100 border-none px-3 py-1 text-xs">Auto-updated</Badge>
             </CardTitle>
             <div className="pt-2">
-              <span className="text-4xl font-extrabold tracking-tight">$3,240</span>
+              <span className="text-4xl font-extrabold tracking-tight">$2,640</span>
               <span className="text-gray-500 font-medium ml-1">total</span>
             </div>
           </CardHeader>
@@ -110,7 +110,7 @@ export const Hero = ({ isLoggedIn = false }: HeroProps) => {
         </Card>
 
         {/* Share card */}
-        <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
+        <Card className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
           <CardHeader className="pb-4 text-left">
             <CardTitle className="flex items-center gap-2 text-[17px] font-bold">
               <Share2 className="w-5 h-5 text-green-600" />
@@ -134,7 +134,7 @@ export const Hero = ({ isLoggedIn = false }: HeroProps) => {
         </Card>
 
         {/* Export card */}
-        <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
+        <Card className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
           <CardHeader className="space-y-4 flex flex-col justify-start items-start text-left pb-4">
             <div className="bg-green-100/70 p-3 rounded-xl mt-2">
               <DollarSign className="w-6 h-6 text-green-600" />

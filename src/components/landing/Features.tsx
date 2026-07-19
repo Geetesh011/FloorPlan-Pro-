@@ -70,11 +70,8 @@ const features: FeatureCardProps[] = [
 export const Features = () => {
   return (
     <section id="features" className="w-full flex flex-col items-center py-24 sm:py-32 space-y-8 px-4">
-      <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-[#333] mb-8 text-center hover:text-[#1bc650] transition-colors duration-300 cursor-default">
-        Everything you need to{" "}
-        <span className="text-[#1de25b]">
-          design & deliver
-        </span>
+      <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-black mb-8 text-center hover:text-[#1bc650] transition-colors duration-300 cursor-default">
+        Everything you need to design & deliver
       </h2>
       <p className="text-center text-muted-foreground md:w-2/3 mx-auto text-xl">
         FloorPlan Pro is purpose-built for interior designers and real estate
@@ -85,7 +82,7 @@ export const Features = () => {
       {/* Feature cards */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-7xl mx-auto pt-8">
         {features.map(({ icon, title, description }) => (
-          <Card key={title} className="shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
+          <Card key={title} className="shadow-2xl border border-gray-50/50 hover:-translate-y-2 transition-transform duration-300 bg-white p-2">
             <CardHeader className="flex flex-row items-center gap-4 pb-4">
               <div className="bg-green-100/70 p-3 rounded-xl">
                 {icon}

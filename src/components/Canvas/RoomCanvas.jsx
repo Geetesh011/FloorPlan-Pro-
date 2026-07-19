@@ -1403,7 +1403,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
             📐 Click to place: <strong style={{ fontWeight: '500', color: 'var(--text-primary, #f8fafc)' }}>{pendingFurniture.name}</strong>
           </div>
         )}
-        {doorPlacementMode && !pendingFurniture && rooms.length > 0 && (
+        {doorPlacementMode && pendingDoorType && !pendingFurniture && rooms.length > 0 && (
           <div className="canvas-toast door-mode">
             🚪 Click on a wall to place a door
           </div>
