@@ -32,10 +32,12 @@ function FurnitureIconImage({ url, width, height }) {
         const res  = await fetch(url);
         let svg    = await res.text();
 
-        // Patch the opening <svg …> tag: remove old width/height/preserveAspectRatio, add ours
+        // Patch the opening <svg …> tag: remove old width/height/preserveAspectRatio, add ours.
+        // We use "xMidYMid meet" (the SVG default) so the icon art keeps its natural aspect ratio
+        // and letterboxes inside the item's physical bounding box instead of stretching to fill it.
         svg = svg.replace(/<svg([^>]*)>/, (_, attrs) => {
           const cleaned = attrs.replace(/\s*(width|height|preserveAspectRatio)\s*=\s*"[^"]*"/gi, '');
-          return `<svg${cleaned} width="${Math.round(width)}" height="${Math.round(height)}" preserveAspectRatio="none">`;
+          return `<svg${cleaned} width="${Math.round(width)}" height="${Math.round(height)}" preserveAspectRatio="xMidYMid meet">`;
         });
 
         blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
