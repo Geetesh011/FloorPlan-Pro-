@@ -254,9 +254,28 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
     return inside;
   };
 
-  /** Returns true if (x, y) falls inside ANY already-confirmed room. */
+  const isPointOnPolygonBoundary = (px, py, points, tol = 1) => {
+    for (let i = 0; i < points.length; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % points.length];
+      
+      const crossProduct = (py - p1.y) * (p2.x - p1.x) - (px - p1.x) * (p2.y - p1.y);
+      if (Math.abs(crossProduct) > tol) continue;
+      
+      const dotProduct = (px - p1.x) * (p2.x - p1.x) + (py - p1.y) * (p2.y - p1.y);
+      if (dotProduct < -tol) continue;
+      
+      const squaredLengthBA = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+      if (dotProduct > squaredLengthBA + tol) continue;
+      
+      return true;
+    }
+    return false;
+  };
+
+  /** Returns true if (x, y) falls STRICTLY inside ANY already-confirmed room. */
   const isInsideAnyRoom = (x, y) =>
-    rooms.some((r) => pointInPolygon(x, y, r.points));
+    rooms.some((r) => pointInPolygon(x, y, r.points) && !isPointOnPolygonBoundary(x, y, r.points));
   // ────────────────────────────────────────────────────────────────────────────
 
   // Wall-snap first (within 15 px of any axis-aligned wall), grid-snap as fallback.
@@ -766,10 +785,30 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
   };
 
   // ── Collect door gaps for a specific wall of a specific room ───────────
-  const getDoorsOnWall = (roomIndex, wallIndex) => {
-    return doors.filter(d => d.roomIndex === roomIndex && d.wallIndex === wallIndex);
+  const getDoorsOnWall = (p1, p2) => {
+    const wallLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (wallLen < 0.1) return [];
+    
+    const overlappingDoors = [];
+    doors.forEach(d => {
+      const dRoom = rooms[d.roomIndex];
+      if (!dRoom) return;
+      const dp1 = dRoom.points[d.wallIndex];
+      const dp2 = dRoom.points[(d.wallIndex + 1) % dRoom.points.length];
+      if (!dp1 || !dp2) return;
+      
+      const doorX = dp1.x + d.positionAlongWall * (dp2.x - dp1.x);
+      const doorY = dp1.y + d.positionAlongWall * (dp2.y - dp1.y);
+      
+      const dist1 = Math.hypot(doorX - p1.x, doorY - p1.y);
+      const dist2 = Math.hypot(doorX - p2.x, doorY - p2.y);
+      
+      if (Math.abs(dist1 + dist2 - wallLen) < 1.0) {
+        overlappingDoors.push({ ...d, positionAlongWall: dist1 / wallLen });
+      }
+    });
+    return overlappingDoors;
   };
-
   const buildWallsAndLabels = (points, keyPrefix, roomIndex) => {
     const walls = [];
     const labels = [];
@@ -818,7 +857,7 @@ function RoomCanvas({ exportRef, pendingFurniture, onFurniturePlaced, placedFurn
       const ay2 = p2.y + offY;
 
       // ── Per-segment wall Lines with door gap splitting ─────────────────
-      const wallDoors = (roomIndex !== undefined) ? getDoorsOnWall(roomIndex, i) : [];
+      const wallDoors = getDoorsOnWall(p1, p2);
 
       if (wallDoors.length === 0) {
         // No doors on this wall — draw solid wall segment
