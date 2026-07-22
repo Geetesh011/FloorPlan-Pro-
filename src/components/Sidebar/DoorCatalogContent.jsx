@@ -126,35 +126,7 @@ function DoorCatalogContent({
         })}
       </div>
 
-      {doors.length > 0 && (
-        <>
-          <div className="door-section-title" style={{ marginTop: '24px' }}>Placed Doors</div>
-          <div className="placed-doors-list">
-            {doors.map(door => {
-              const typeInfo = DOOR_TYPES.find(t => t.id === door.type) || DOOR_TYPES[0];
-              const roomName = rooms[door.roomIndex]?.label || `Room ${door.roomIndex + 1}`;
-              return (
-                <div key={door.id} className="placed-door-card">
-                  <div className="placed-door-thumb-small">
-                    <DoorThumbnail type={door.type} isSmall={true} />
-                  </div>
-                  <div className="placed-door-details">
-                    <div className="placed-door-name">{typeInfo.label} • {door.width} ft</div>
-                    <div className="placed-door-room">{roomName}</div>
-                  </div>
-                  <button
-                    className="placed-door-remove"
-                    onClick={() => handleRemoveDoor(door.id)}
-                    title="Remove Door"
-                  >
-                    🗑
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+
     </div>
   );
 }
