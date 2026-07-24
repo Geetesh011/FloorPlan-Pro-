@@ -20,7 +20,7 @@ export const Hero = ({ isLoggedIn = false }: HeroProps) => {
   const ctaLabel = isLoggedIn ? "Go to Dashboard" : "Start designing free";
 
   return (
-    <section className="w-full flex flex-col items-center text-center py-24 gap-16 px-4">
+    <section className="w-full flex flex-col items-center text-center pt-8 pb-24 gap-16 px-4">
       <div className="flex flex-col lg:flex-row items-center justify-between gap-12 w-full max-w-7xl mx-auto z-10 relative">
         {/* Left: Text block */}
         <div className="max-w-2xl space-y-6 flex flex-col items-start text-left lg:w-[55%]">
